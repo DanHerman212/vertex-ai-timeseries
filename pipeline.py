@@ -99,7 +99,7 @@ def gru_pipeline(
     train_gru_task.set_cpu_limit('4')
     train_gru_task.set_memory_limit('16G')
     train_gru_task.set_gpu_limit(1)
-    train_gru_task.set_accelerator_type('NVIDIA_TESLA_T4')
+    train_gru_task.add_node_selector_constraint(label_name='cloud.google.com/gke-accelerator', value='nvidia-tesla-t4')
 
 if __name__ == "__main__":
     compiler.Compiler().compile(

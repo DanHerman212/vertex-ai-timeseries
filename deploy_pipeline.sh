@@ -64,11 +64,16 @@ if ! command -v gcloud &> /dev/null; then
 fi
 
 # 1. Build and Push Docker Image
-echo ""
-echo "[1/3] Building and Pushing Docker Image..."
-# Use Cloud Build to avoid local disk space issues with large GPU images
-echo "Submitting build to Cloud Build..."
-gcloud builds submit --tag $IMAGE_URI .
+if [ "$1" == "--skip-build" ]; then
+    echo ""
+    echo "[1/3] Skipping Docker Build..."
+else
+    echo ""
+    echo "[1/3] Building and Pushing Docker Image..."
+    # Use Cloud Build to avoid local disk space issues with large GPU images
+    echo "Submitting build to Cloud Build..."
+    gcloud builds submit --tag $IMAGE_URI .
+fi
 
 # 2. Compile Pipeline
 echo ""
