@@ -99,7 +99,9 @@ def gru_pipeline(
     train_gru_task.set_cpu_limit('4')
     train_gru_task.set_memory_limit('16G')
     train_gru_task.set_gpu_limit(1)
-    train_gru_task.add_node_selector_constraint('cloud.google.com/gke-accelerator', 'nvidia-tesla-t4')
+    # Using set_accelerator_type is the modern KFP v2 standard.
+    # If this fails, it is likely due to a specific version mismatch in the environment.
+    train_gru_task.set_accelerator_type('NVIDIA_TESLA_T4')
 
 if __name__ == "__main__":
     compiler.Compiler().compile(
