@@ -12,8 +12,9 @@ RUN pip install torch --index-url https://download.pytorch.org/whl/cu121
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy training code
-COPY src/ .
+# Copy training code and data
+COPY src/ src/
+COPY weather_data.csv .
 
 # Set entrypoint (optional, can be overridden by pipeline)
 # ENTRYPOINT ["python", "train_model.py"]
