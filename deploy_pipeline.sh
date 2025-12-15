@@ -66,15 +66,9 @@ fi
 # 1. Build and Push Docker Image
 echo ""
 echo "[1/3] Building and Pushing Docker Image..."
-# Ensure we are authenticated with the registry
-echo "Configuring docker auth for ${REGION}-docker.pkg.dev..."
-gcloud auth configure-docker ${REGION}-docker.pkg.dev --quiet
-
-echo "Building image..."
-docker build --platform linux/amd64 -t $IMAGE_URI .
-
-echo "Pushing image..."
-docker push $IMAGE_URI
+# Use Cloud Build to avoid local disk space issues with large GPU images
+echo "Submitting build to Cloud Build..."
+gcloud builds submit --tag $IMAGE_URI .
 
 # 2. Compile Pipeline
 echo ""
