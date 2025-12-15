@@ -78,10 +78,10 @@ fi
 # 2. Compile Pipeline
 echo ""
 echo "[2/3] Compiling Pipeline..."
-# Ensure kfp is installed locally or use a virtualenv
-if ! python -c "import kfp" &> /dev/null; then
-    echo "Installing KFP SDK..."
-    pip install kfp google-cloud-pipeline-components
+# Ensure kfp and aiplatform are installed locally
+if ! python -c "import kfp; import google.cloud.aiplatform" &> /dev/null; then
+    echo "Installing KFP and Vertex AI SDK..."
+    pip install kfp google-cloud-pipeline-components google-cloud-aiplatform
 fi
 
 python pipeline.py
@@ -94,13 +94,15 @@ fi
 # 3. Run Pipeline
 echo ""
 echo "[3/3] Submitting Pipeline Job to Vertex AI..."
-gcloud beta ai pipelines run \
-  --project=$PROJECT_ID \
-  --region=$REGION \
-  --display-name="gru-training-run-$(date +%Y%m%d-%H%M%S)" \
-  --pipeline-file=$PIPELINE_JSON \
-  --pipeline-root=$PIPELINE_ROOT \
-  --parameter-values="project_id=$PROJECT_ID,bq_query=$BQ_QUERY,bucket_name=$BUCKET_NAME,training_image_uri=$IMAGE_URI"
+# Use Python script to bypass gcloud CLI version issues
+python submit_pipeline.py \
+  --project_id="$PROJECT_ID" \
+  --region="$REGION" \
+  --bucket_name="$BUCKET_NAME" \
+  --pipeline_root="$PIPELINE_ROOT" \
+  --pipeline_json="$PIPELINE_JSON" \
+  --bq_query="$BQ_QUERY" \
+  --training_image_uri="$IMAGE_URI"
 
 echo ""
 echo "========================================================"
