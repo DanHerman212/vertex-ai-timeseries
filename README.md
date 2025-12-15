@@ -2,9 +2,9 @@
 
 ## Prerequisites
 
-Google Cloud SDK
-Docker
-Python 3.11
+Google Cloud SDK<br>
+Docker<br>
+Python 3.11<br>
 
 ## Setup
 
