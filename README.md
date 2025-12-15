@@ -1,4 +1,8 @@
-# Final Deployment Checklist
+# NHITS & GRU Training Pipeline on GCP
+
+This repository contains the end-to-end machine learning pipeline for training and evaluating time-series forecasting models (NHITS and GRU) on Google Cloud Platform (Vertex AI).
+
+## Deployment Checklist
 
 Use this checklist to ensure your environment and project are ready for the first deployment to Vertex AI.
 
