@@ -1,6 +1,6 @@
 from kfp import dsl
-from kfp.v2 import compiler
-from kfp.v2.dsl import (
+from kfp import compiler
+from kfp.dsl import (
     component,
     Input,
     Output,
@@ -98,8 +98,8 @@ def gru_pipeline(
     # Configure GPU resources
     train_gru_task.set_cpu_limit('4')
     train_gru_task.set_memory_limit('16G')
+    train_gru_task.set_accelerator_type('NVIDIA_TESLA_T4')
     train_gru_task.set_gpu_limit(1)
-    train_gru_task.add_node_selector_constraint('cloud.google.com/gke-accelerator', 'nvidia-tesla-t4')
 
 if __name__ == "__main__":
     compiler.Compiler().compile(
