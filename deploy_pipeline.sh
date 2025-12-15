@@ -94,7 +94,7 @@ fi
 # 3. Run Pipeline
 echo ""
 echo "[3/3] Submitting Pipeline Job to Vertex AI..."
-gcloud ai pipelines run \
+gcloud beta ai pipelines run \
   --project=$PROJECT_ID \
   --region=$REGION \
   --display-name="gru-training-run-$(date +%Y%m%d-%H%M%S)" \
