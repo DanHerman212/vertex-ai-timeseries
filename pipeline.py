@@ -12,7 +12,7 @@ import os
 
 # 1. Component: Extract Data from BigQuery
 @component(
-    packages_to_install=["google-cloud-bigquery", "pandas", "pyarrow", "db-dtypes"],
+    packages_to_install=["google-cloud-bigquery", "google-cloud-bigquery-storage", "pandas", "pyarrow", "db-dtypes"],
     base_image="python:3.11"
 )
 def extract_bq_data(
