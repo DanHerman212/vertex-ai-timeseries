@@ -1,0 +1,218 @@
+import os
+import argparse
+import numpy as np
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import layers
+from google.cloud import storage
+import joblib
+
+def load_data_manual(input_path):
+    print(f"Loading data from {input_path}...")
+    with open(input_path) as f:
+        data = f.read()
+
+    lines = data.split("\n")
+    header = lines[0].split(",")
+    lines = lines[1:]
+    print(f"Header: {header}")
+    print(f"Total lines: {len(lines)}")
+    
+    # Parse lines
+    lines = [line for line in lines if line.strip()]
+
+    mbt = np.zeros((len(lines),))
+    # raw_data excludes the first column (date)
+    raw_data = np.zeros((len(lines), len(header) - 1))
+    
+    for i, line in enumerate(lines):
+        values = [float(x) for x in line.split(",")[1:]]
+        mbt[i] = values[1] # Assuming mbt is at index 1 of the values (2nd numeric column)
+        raw_data[i, :] = values[:]
+        
+    return mbt, raw_data
+
+def split_data(raw_data):
+    n = len(raw_data)
+    num_train_samples = int(0.6 * n)
+    num_val_samples = int(0.2 * n)
+    num_test_samples = n - num_train_samples - num_val_samples
+    
+    print("Training Samples:", num_train_samples)
+    print("Validation Samples:", num_val_samples)
+    print("Test Samples:", num_test_samples)
+    
+    return num_train_samples, num_val_samples, num_test_samples
+
+def scale_data(raw_data, num_train_samples):
+    train_mean = np.mean(raw_data[:num_train_samples, :], axis=0)
+    train_std = np.std(raw_data[:num_train_samples, :], axis=0)
+    
+    # Apply standard scaling to all columns
+    raw_data_scaled = (raw_data - train_mean) / train_std
+    
+    return raw_data_scaled, train_mean, train_std
+
+def create_datasets(raw_data, mbt, num_train_samples, num_val_samples, sequence_length=150, batch_size=128):
+    # Train Dataset
+    train_dataset = keras.utils.timeseries_dataset_from_array(
+        data=raw_data[:-sequence_length],
+        targets=mbt[sequence_length:, None],
+        sequence_length=sequence_length,
+        sampling_rate=1,
+        batch_size=batch_size,
+        shuffle=True,
+        start_index=0,
+        end_index=num_train_samples
+    )
+    
+    # Validation Dataset
+    val_dataset = keras.utils.timeseries_dataset_from_array(
+        data=raw_data[:-sequence_length],
+        targets=mbt[sequence_length:, None],
+        sequence_length=sequence_length,
+        sampling_rate=1,
+        batch_size=batch_size,
+        shuffle=False,
+        start_index=num_train_samples,
+        end_index=num_train_samples + num_val_samples
+    )
+    
+    # Test Dataset
+    test_dataset = keras.utils.timeseries_dataset_from_array(
+        data=raw_data[:-sequence_length],
+        targets=mbt[sequence_length:, None],
+        sequence_length=sequence_length,
+        sampling_rate=1,
+        batch_size=batch_size,
+        shuffle=False,
+        start_index=num_train_samples + num_val_samples,
+        end_index=None
+    )
+    
+    return train_dataset, val_dataset, test_dataset
+
+def run_experiment(model, train_ds, val_ds, model_name, epochs=50, patience=5):
+    # 1. Optimization Schedule
+    lr_schedule = keras.optimizers.schedules.CosineDecay(
+        initial_learning_rate=0.001,
+        decay_steps=epochs * len(train_ds),
+        alpha=0.001 
+    )
+
+    # 2. Callbacks
+    callbacks = [
+        keras.callbacks.ModelCheckpoint(
+            filepath=f"{model_name}.keras",
+            save_best_only=True,
+            monitor="val_loss",
+            mode="min",
+            verbose=0
+        ),
+        keras.callbacks.EarlyStopping(
+            monitor="val_loss",
+            patience=patience,
+            restore_best_weights=True,
+            verbose=1
+        )
+    ]
+
+    # 3. Compile
+    model.compile(
+        optimizer=keras.optimizers.AdamW(learning_rate=lr_schedule, weight_decay=1e-4),
+        loss=keras.losses.Huber(delta=1.0),
+        metrics=["mae"]
+    )
+
+    # 4. Fit
+    print(f"\nStarting training for: {model_name}")
+    history = model.fit(
+        train_ds,
+        epochs=epochs,
+        validation_data=val_ds,
+        callbacks=callbacks,
+        verbose=1
+    )
+
+    return history
+
+def build_optimized_gru_model(input_shape):
+    inputs = keras.Input(shape=input_shape)
+
+    # Layer 1: GRU
+    x = layers.GRU(64, return_sequences=True)(inputs)
+    x = layers.LayerNormalization()(x)
+    x = layers.SpatialDropout1D(0.3)(x)
+
+    # Layer 2: GRU
+    x = layers.GRU(64, return_sequences=True)(x)
+    x = layers.LayerNormalization()(x)
+    x = layers.SpatialDropout1D(0.3)(x)
+
+    # Layer 3: GRU
+    x = layers.GRU(32, return_sequences=False)(x)
+    x = layers.LayerNormalization()(x)
+    x = layers.Dropout(0.2)(x)
+
+    # Dense Head
+    outputs = layers.Dense(1)(x)
+
+    model = keras.Model(inputs=inputs, outputs=outputs, name="optimized_gru")
+    return model
+
+def upload_to_gcs(local_path, bucket_name, blob_path):
+    client = storage.Client()
+    bucket = client.bucket(bucket_name)
+    for root, dirs, files in os.walk(local_path):
+        for file in files:
+            local_file = os.path.join(root, file)
+            remote_path = os.path.join(blob_path, os.path.relpath(local_file, local_path))
+            blob = bucket.blob(remote_path)
+            blob.upload_from_filename(local_file)
+            print(f"Uploaded {local_file} to gs://{bucket_name}/{remote_path}")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--input_csv', type=str, required=True, help='Path to input CSV file')
+    parser.add_argument('--bucket_name', type=str, help='GCS Bucket name')
+    parser.add_argument('--model_dir', type=str, default='gru_model', help='Local directory to save model')
+    args = parser.parse_args()
+
+    # 1. Load Data
+    mbt, raw_data = load_data_manual(args.input_csv)
+    
+    # 2. Split
+    num_train, num_val, num_test = split_data(raw_data)
+    
+    # 3. Scale
+    raw_data_scaled, train_mean, train_std = scale_data(raw_data, num_train)
+    
+    # Save scaler
+    if not os.path.exists(args.model_dir):
+        os.makedirs(args.model_dir)
+    joblib.dump({'mean': train_mean, 'std': train_std}, os.path.join(args.model_dir, 'scaler.pkl'))
+    
+    # 4. Create Datasets
+    train_ds, val_ds, test_ds = create_datasets(raw_data_scaled, mbt, num_train, num_val)
+    
+    # 5. Build Model
+    input_shape = (150, raw_data_scaled.shape[1])
+    model = build_optimized_gru_model(input_shape)
+    model.summary()
+    
+    # 6. Run Experiment
+    history = run_experiment(model, train_ds, val_ds, "optimized_gru", epochs=50, patience=5)
+    
+    # 7. Save Model
+    best_model_path = "optimized_gru.keras"
+    final_path = os.path.join(args.model_dir, 'gru_model.keras')
+    if os.path.exists(best_model_path):
+        os.rename(best_model_path, final_path)
+        print(f"Best model moved to {final_path}")
+    else:
+        model.save(final_path)
+        print(f"Model saved to {final_path}")
+
+    # Upload if bucket provided
+    if args.bucket_name:
+        upload_to_gcs(args.model_dir, args.bucket_name, "models/gru/v1")

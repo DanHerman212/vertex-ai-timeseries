@@ -1,0 +1,11 @@
+neuralforecast
+pandas
+numpy
+google-cloud-storage
+google-cloud-aiplatform
+google-cloud-bigquery
+db-dtypes
+kfp
+pyarrow
+apache-beam[gcp]
+tensorflow
