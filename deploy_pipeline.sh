@@ -34,12 +34,12 @@ REPO_NAME=${REPO_NAME:-"ml-pipelines"}
 IMAGE_NAME=${IMAGE_NAME:-"gru-training"}
 TAG=${TAG:-"v1"}
 BUCKET_NAME=${BUCKET_NAME:-"time-series-478616-ml-pipeline"}
-BQ_QUERY=${BQ_QUERY:-"select
+BQ_QUERY=${BQ_QUERY:-'select
   arrival_date,
   duration,
   mbt
-from \`mta_historical_v3.ml_cleaned\`
-where extract(year from arrival_date) >= 2024"}
+from `mta_historical_v3.ml_cleaned`
+where extract(year from arrival_date) >= 2024'}
 
 # Derived Variables
 IMAGE_URI="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${IMAGE_NAME}:${TAG}"
