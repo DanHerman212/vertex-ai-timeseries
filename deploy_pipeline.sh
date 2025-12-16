@@ -81,8 +81,8 @@ echo ""
 echo "[2/3] Compiling Pipeline..."
 # Only install lightweight compilation dependencies, not the full training requirements
 echo "Installing KFP and Pipeline Components..."
-# Pinning google-cloud-pipeline-components to 2.15.0 to ensure ModelUploadOp signature compatibility
-pip install "kfp>=2.7.0" "google-cloud-pipeline-components==2.15.0" "google-cloud-aiplatform>=1.38.0"
+# Pinning google-cloud-pipeline-components to a version compatible with Python 3.12
+pip install "kfp>=2.7.0" "google-cloud-pipeline-components>=2.18.0" "google-cloud-aiplatform>=1.38.0"
 
 # Export the image URI so pipeline.py can use it during compilation
 export TRAINING_IMAGE_URI="$IMAGE_URI"

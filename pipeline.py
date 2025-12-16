@@ -117,6 +117,8 @@ def gru_pipeline(
     # train_gru_task.set_memory_limit('32G')
 
     # Step 4: Upload to Model Registry
+    # Note: For google-cloud-pipeline-components >= 2.0, the parameter is 'artifact_uri' or 'unmanaged_container_model'
+    # depending on the specific version. In v2.15+, 'unmanaged_container_model' is correct for ModelUploadOp.
     model_upload_task = ModelUploadOp(
         project=project_id,
         location=region,
