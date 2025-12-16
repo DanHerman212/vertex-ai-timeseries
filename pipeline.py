@@ -105,14 +105,14 @@ def gru_pipeline(
     )
 
     # Configure GPU resources
-    train_gru_task.set_cpu_limit('4')
-    train_gru_task.set_memory_limit('16G')
-    train_gru_task.set_gpu_limit(1)
-    train_gru_task.set_accelerator_type('NVIDIA_TESLA_T4')
+    # train_gru_task.set_cpu_limit('4')
+    # train_gru_task.set_memory_limit('16G')
+    # train_gru_task.set_gpu_limit(1)
+    # train_gru_task.set_accelerator_type('NVIDIA_TESLA_T4')
     
     # Fallback to CPU for now due to Quota issues
-    # train_gru_task.set_cpu_limit('8')
-    # train_gru_task.set_memory_limit('32G')
+    train_gru_task.set_cpu_limit('8')
+    train_gru_task.set_memory_limit('32G')
 
     # Step 4: Evaluate
     evaluate_task = evaluate_model_component(
