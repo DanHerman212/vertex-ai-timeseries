@@ -182,11 +182,6 @@ if __name__ == "__main__":
     # 3. Scale
     raw_data_scaled, train_mean, train_std = scale_data(raw_data, num_train)
     
-    # Save scaler
-    if not os.path.exists(args.model_dir):
-        os.makedirs(args.model_dir)
-    joblib.dump({'mean': train_mean, 'std': train_std}, os.path.join(args.model_dir, 'scaler.pkl'))
-    
     # 4. Create Datasets
     train_ds, val_ds, test_ds = create_datasets(raw_data_scaled, mbt, num_train, num_val)
     
@@ -205,9 +200,17 @@ if __name__ == "__main__":
         print(f"Loading best model from {best_model_path}...")
         best_model = keras.models.load_model(best_model_path)
         print(f"Saving model to {args.model_dir} in SavedModel format...")
-        best_model.save(args.model_dir) # Saves as SavedModel directory
+        # Use export() or tf.saved_model.save() for Keras 3+ to generate a SavedModel directory
+        best_model.export(args.model_dir)
     else:
         print(f"Best model not found. Saving current model to {args.model_dir}...")
-        model.save(args.model_dir)
+        model.export(args.model_dir)
+
+    # 8. Save Scaler (after model export to ensure directory exists and isn't overwritten)
+    print(f"Saving scaler to {args.model_dir}...")
+    # Ensure directory exists (export should have created it, but just in case)
+    if not os.path.exists(args.model_dir):
+        os.makedirs(args.model_dir)
+    joblib.dump({'mean': train_mean, 'std': train_std}, os.path.join(args.model_dir, 'scaler.pkl'))
 
 
