@@ -8,10 +8,6 @@ RUN apt-get update && apt-get install -y build-essential git
 # Install uv for faster dependency resolution
 RUN pip install uv
 
-# Install torch with CUDA support (compatible with CUDA 12.x from TF image)
-# Note: The base image likely has CUDA 12.x.
-RUN uv pip install --system torch --index-url https://download.pytorch.org/whl/cu121
-
 # Install python dependencies
 COPY requirements.txt .
 RUN uv pip install --system --no-cache -r requirements.txt
