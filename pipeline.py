@@ -11,24 +11,21 @@ from kfp.dsl import (
 import os
 
 # 1. Component: Extract Data from BigQuery
-@component(
-    packages_to_install=["google-cloud-bigquery", "google-cloud-bigquery-storage", "pandas", "pyarrow", "db-dtypes"],
-    base_image="python:3.11"
-)
+@dsl.container_component
 def extract_bq_data(
     project_id: str,
     query: str,
-    output_dataset: Output[Dataset]
+    output_dataset: dsl.Output[dsl.Dataset]
 ):
-    from google.cloud import bigquery
-    
-    client = bigquery.Client(project=project_id)
-    query_job = client.query(query)
-    df = query_job.to_dataframe()
-    
-    # Save to the output artifact path
-    # The path provided by KFP usually doesn't have an extension, so we can just write to it
-    df.to_csv(output_dataset.path, index=False)
+    return dsl.ContainerSpec(
+        image='us-east1-docker.pkg.dev/time-series-478616/ml-pipelines/gru-training:v1',
+        command=["python", "src/extract.py"],
+        args=[
+            "--project_id", project_id,
+            "--query", query,
+            "--output_csv", output_dataset.path
+        ]
+    )
 
 # 2. Component Definition for Custom Scripts
 # We define container components that use the custom image directly.

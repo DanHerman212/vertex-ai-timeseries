@@ -140,6 +140,8 @@ def preprocess_data(input_path, output_path):
     df = df.bfill()
 
     print(f"Saving processed data to {output_path}...")
+    # Ensure directory exists
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
     df.to_csv(output_path, index=False)
     print("Preprocessing complete.")
 
