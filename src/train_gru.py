@@ -213,4 +213,11 @@ if __name__ == "__main__":
         os.makedirs(args.model_dir)
     joblib.dump({'mean': train_mean, 'std': train_std}, os.path.join(args.model_dir, 'scaler.pkl'))
 
+    # 9. Save Training History
+    print(f"Saving training history to {args.model_dir}...")
+    import json
+    history_path = os.path.join(args.model_dir, "history.json")
+    with open(history_path, 'w') as f:
+        json.dump(history.history, f)
+
 

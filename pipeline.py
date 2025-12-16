@@ -68,6 +68,7 @@ def evaluate_model_component(
     input_csv: dsl.Input[dsl.Dataset],
     model_dir: dsl.Input[artifact_types.UnmanagedContainerModel],
     metrics: dsl.Output[dsl.Metrics],
+    loss_plot: dsl.Output[dsl.HTML],
 ):
     return dsl.ContainerSpec(
         image=TRAINING_IMAGE_URI,
@@ -75,7 +76,8 @@ def evaluate_model_component(
         args=[
             "--input_csv", input_csv.path,
             "--model_dir", model_dir.path,
-            "--metrics_output_path", metrics.path
+            "--metrics_output_path", metrics.path,
+            "--plot_output_path", loss_plot.path
         ]
     )
 
@@ -135,7 +137,7 @@ def gru_pipeline(
     # so that Vertex AI knows which image to use for deployment.
     model_with_metadata_task = attach_serving_spec(
         original_model=train_gru_task.outputs["model_dir"],
-        serving_image_uri="us-docker.pkg.dev/vertex-ai/prediction/tf2-cpu.2-17:latest"
+        serving_image_uri="us-docker.pkg.dev/vertex-ai/prediction/tf2-cpu.2-16:latest"
     )
 
     # Step 4: Upload to Model Registry

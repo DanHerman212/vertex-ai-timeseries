@@ -5,6 +5,7 @@ import os
 import json
 import joblib
 import tensorflow as tf
+import matplotlib.pyplot as plt
 from sklearn.metrics import mean_absolute_error
 from google.cloud import storage
 
@@ -54,28 +55,25 @@ def evaluate_gru(model_dir, raw_data, mbt, test_start_idx, sequence_length=150):
         # Let's create a simple wrapper function.
         def predict_wrapper(input_data):
             # input_data is numpy array (batch, seq_len, features)
-            # Convert to tensor
-            input_tensor = tf.convert_to_tensor(input_data, dtype=tf.float32)
+            # Convert to tensor. Use tf.cast to handle float64 inputs safely.
+            input_tensor = tf.cast(input_data, dtype=tf.float32)
+            
             # Run inference
-            # Try calling with positional argument first
+            # Check signature to determine if we need kwargs
+            args, kwargs = inference_func.structured_input_signature
+            
             try:
-                output = inference_func(input_tensor)
+                if not args and kwargs:
+                    # No positional args, but we have kwargs.
+                    # Assuming single input for now, use the first key.
+                    key = list(kwargs.keys())[0]
+                    output = inference_func(**{key: input_tensor})
+                else:
+                    # Try positional
+                    output = inference_func(input_tensor)
             except Exception as e:
-                print(f"Positional call failed: {e}. Trying with keyword arguments...")
-                # If positional fails, try to find the input key
-                # structured_input_signature is a tuple: (args, kwargs)
-                # args is a tuple of TensorSpecs
-                # kwargs is a dict of TensorSpecs
-                # Usually for Keras models, it's in args[0] or kwargs
-                # But inference_func.structured_input_signature might be empty for some reason?
-                # Let's try to inspect the concrete function inputs
-                if hasattr(inference_func, 'inputs') and len(inference_func.inputs) > 0:
-                     # This is a bit hacky, but often the input tensor name is needed
-                     # But usually positional works for single input.
-                     # If it failed, maybe it expects a specific key.
-                     # Let's try 'inputs' or 'input_1' or 'args_0'
-                     # For now, re-raise to see the error in logs if we can't handle it
-                     raise e
+                print(f"Inference call failed: {e}. Signature: {inference_func.structured_input_signature}")
+                raise e
             
             # The output key is usually 'dense' or similar, or we take the first output
             # Let's inspect keys if needed, but usually it's the output layer name.
@@ -159,11 +157,66 @@ def evaluate_gru(model_dir, raw_data, mbt, test_start_idx, sequence_length=150):
     print(f"GRU Test MAE: {mae}")
     return mae
 
+def plot_loss(model_dir, output_path):
+    history_path = os.path.join(model_dir, "history.json")
+    if not os.path.exists(history_path):
+        print(f"No history found at {history_path}, skipping plot.")
+        return
+
+    with open(history_path, 'r') as f:
+        history = json.load(f)
+
+    plt.figure(figsize=(10, 6))
+    if 'loss' in history:
+        plt.plot(history['loss'], label='Train Loss')
+    if 'val_loss' in history:
+        plt.plot(history['val_loss'], label='Validation Loss')
+    
+    plt.title('Model Training Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.grid(True)
+    
+    # Save as HTML for Vertex AI visualization
+    # We can save as an image and embed it in HTML, or just save as image if the output type allows.
+    # But Vertex AI 'HTML' artifact expects an HTML file.
+    # Let's save the plot to a temporary image file, then embed it in HTML.
+    
+    # Actually, let's just save as a static image first, but since the artifact type is HTML,
+    # we need to wrap it.
+    
+    import base64
+    from io import BytesIO
+    
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    buf.seek(0)
+    img_base64 = base64.b64encode(buf.read()).decode('utf-8')
+    
+    html_content = f"""
+    <html>
+    <head>
+        <title>Training Loss</title>
+    </head>
+    <body>
+        <h1>Training Loss</h1>
+        <img src="data:image/png;base64,{img_base64}" alt="Training Loss Plot">
+    </body>
+    </html>
+    """
+    
+    with open(output_path, 'w') as f:
+        f.write(html_content)
+    
+    print(f"Loss plot saved to {output_path}")
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--input_csv', type=str, required=True)
     parser.add_argument('--model_dir', type=str, required=True)
     parser.add_argument('--metrics_output_path', type=str, required=True)
+    parser.add_argument('--plot_output_path', type=str, required=False)
     args = parser.parse_args()
 
     # 1. Load Data
@@ -177,7 +230,11 @@ if __name__ == "__main__":
     # 3. Evaluate
     mae = evaluate_gru(args.model_dir, raw_data, mbt, test_start_idx)
     
-    # 4. Save Metrics for Vertex AI
+    # 4. Plot Loss
+    if args.plot_output_path:
+        plot_loss(args.model_dir, args.plot_output_path)
+    
+    # 5. Save Metrics for Vertex AI
     metrics = {
         "metrics": [
             {

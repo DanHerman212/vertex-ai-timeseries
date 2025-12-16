@@ -1,4 +1,4 @@
-FROM us-docker.pkg.dev/vertex-ai/training/tf-gpu.2-17.py310:latest
+FROM us-docker.pkg.dev/vertex-ai/training/tf-gpu.2-16.py310:latest
 
 WORKDIR /app
 
