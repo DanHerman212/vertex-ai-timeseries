@@ -1,0 +1,19 @@
+FROM python:3.10-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y build-essential
+
+# Install serving dependencies
+# neuralforecast for the model, fastapi/uvicorn for the server
+RUN pip install neuralforecast==1.6.4 pandas numpy fastapi uvicorn
+
+# Copy serving code
+COPY src/serve.py src/serve.py
+
+# Expose the port Vertex AI expects
+EXPOSE 8080
+
+# Set entrypoint to run the server
+CMD ["python", "src/serve.py"]

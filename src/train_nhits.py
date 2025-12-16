@@ -27,28 +27,6 @@ def load_data(input_path):
     # Add unique_id
     df['unique_id'] = 'E'
     
-    # --- Feature Engineering ---
-    print("Generating features...")
-    
-    # 1. Cyclic Date Features
-    df['week_sin'] = np.sin(2 * np.pi * df['ds'].dt.dayofweek / 7)
-    df['week_cos'] = np.cos(2 * np.pi * df['ds'].dt.dayofweek / 7)
-    df['day_sin'] = np.sin(2 * np.pi * df['ds'].dt.hour / 24)
-    df['day_cos'] = np.cos(2 * np.pi * df['ds'].dt.hour / 24)
-    
-    # 2. Rolling Features (Historical Exogenous)
-    # We need to shift by 1 to avoid leakage (using past to predict future)
-    # However, NeuralForecast handles lags. But if we pass them as hist_exog, they must be in the df.
-    # For simplicity, we'll compute them on 'y'.
-    df['rolling_mean_10'] = df['y'].shift(1).rolling(window=10).mean()
-    df['rolling_std_10'] = df['y'].shift(1).rolling(window=10).std()
-    df['rolling_mean_50'] = df['y'].shift(1).rolling(window=50).mean()
-    df['rolling_std_50'] = df['y'].shift(1).rolling(window=50).std()
-    df['rolling_max_10'] = df['y'].shift(1).rolling(window=10).max()
-    
-    # Drop NaNs created by rolling/shifting
-    df = df.dropna()
-    
     print(f"Data shape after processing: {df.shape}")
     return df
 
@@ -63,7 +41,8 @@ def train_and_save(model_dir, input_path):
     # Define Exogenous Variables
     # Note: futr_exog_list requires these columns to be known in the future. 
     # Since they are calendar based, they are fine.
-    futr_exog_list = ['week_sin', 'week_cos', 'day_sin', 'day_cos'] 
+    futr_exog_list = ['temp', 'precip', 'snow', 'snowdepth', 'visibility', 'windspeed',
+                      'week_sin', 'week_cos', 'day_sin', 'day_cos']
     hist_exog_list = ['rolling_mean_10', 'rolling_std_10', 'rolling_mean_50', 'rolling_std_50', 'rolling_max_10']
     
     # 2. Define Model
