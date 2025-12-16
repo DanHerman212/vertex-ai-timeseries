@@ -35,7 +35,6 @@ nhits_gcp_workflow/
 ├── requirements.nhits.txt              # Python dependencies for NHITS training
 ├── requirements.txt                    # General Python dependencies for the project
 ├── submit_pipeline.py                  # Script to submit the pipeline job to Vertex AI
-├── text.sh                             # (Likely a utility or test shell script)
 ├── weather_data.csv                    # Dataset used for training/testing
 ├── src/                                # Source code for pipeline components
 │   ├── evaluate_models.py              # Component for evaluating trained models
@@ -51,4 +50,5 @@ nhits_gcp_workflow/
     ├── model_utils.py                  # Shared utilities for the notebooks
     ├── nhits_training_workflow.ipynb   # Notebook for NHITS model development
     └── tensorflow_lstm_gru_workflow.ipynb # Notebook for LSTM/GRU model development
-    ```
+    
+```
