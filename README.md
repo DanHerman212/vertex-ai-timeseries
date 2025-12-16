@@ -12,6 +12,8 @@ The pipeline consists of the following steps:
 2. **Preprocess**: Clean the data, remove outliers, engineer features from weather, rolling regime and trigonomic functions cos and sin
 3. **Train**: Train both NHITS and GRU models using GPU
 4. **Evaluate**: Assess model performance using Mean Absolute Error (MAE) on a test dataset, selecting the best model as the champion
+5. **Attach Serving Spec**: Prepare the winning model for deployment with appropriate serving specifications
+6. **Deploy**: Deploy the champion model to Vertex AI Model Registry for online predictions
 
 
 The repo is nearly complete and is expected to finish before the end of DEC 2025.  Feel free to browse all the code and ask any questions.
