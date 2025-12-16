@@ -79,11 +79,9 @@ fi
 # 2. Compile Pipeline
 echo ""
 echo "[2/3] Compiling Pipeline..."
-# Ensure kfp and aiplatform are installed locally
-if ! python -c "import kfp; import google.cloud.aiplatform" &> /dev/null; then
-    echo "Installing KFP and Vertex AI SDK..."
-    pip install kfp google-cloud-pipeline-components google-cloud-aiplatform
-fi
+# Force install dependencies from requirements.txt to ensure version compatibility
+echo "Installing/Updating Python dependencies from requirements.txt..."
+pip install -r requirements.txt
 
 # Export the image URI so pipeline.py can use it during compilation
 export TRAINING_IMAGE_URI="$IMAGE_URI"
