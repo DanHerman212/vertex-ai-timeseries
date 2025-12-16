@@ -121,7 +121,7 @@ def gru_pipeline(
         location=region,
         display_name=model_display_name,
         unmanaged_container_model=train_gru_task.outputs["model_dir"],
-        serving_container_image_uri="us-docker.pkg.dev/vertex-ai/prediction/tf2-cpu.2-12:latest"
+        serving_container_image_uri="us-docker.pkg.dev/vertex-ai/prediction/tf2-cpu.2-15:latest"
     )
 
     # Step 5: Evaluate
