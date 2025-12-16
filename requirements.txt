@@ -10,4 +10,5 @@ pyarrow
 apache-beam[gcp]
 joblib
 scikit-learn
+protobuf==3.20.3
 
