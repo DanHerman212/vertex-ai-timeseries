@@ -142,20 +142,16 @@ def evaluate_gru(model_dir, raw_data, mbt, test_start_idx, sequence_length=150):
     else:
          predictions_scaled = model_predict(test_ds, verbose=1)
     
-    # Inverse Transform
-    # mbt was at index 1 of the features passed to scale_data in train_gru.py
-    target_col_idx = 1 
-    pred_mean = train_mean[target_col_idx]
-    pred_std = train_std[target_col_idx]
-    
-    predictions = (predictions_scaled * pred_std) + pred_mean
+    # Model was trained on raw targets (mbt), so predictions are already in raw scale.
+    # No inverse transform needed for the target variable.
+    predictions = predictions_scaled
     
     # Get Actuals
     actuals = np.concatenate([y for x, y in test_ds], axis=0)
     
     mae = float(mean_absolute_error(actuals, predictions))
     print(f"GRU Test MAE: {mae}")
-    return mae
+    return mae, actuals, predictions
 
 def plot_loss(model_dir, output_path):
     history_path = os.path.join(model_dir, "history.json")
@@ -206,10 +202,58 @@ def plot_loss(model_dir, output_path):
     </html>
     """
     
+    import os
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, 'w') as f:
         f.write(html_content)
     
     print(f"Loss plot saved to {output_path}")
+
+def plot_predictions(actuals, predictions, output_path):
+    plt.figure(figsize=(12, 6))
+    
+    # Plot a subset if data is too large
+    limit = 500
+    if len(actuals) > limit:
+        plt.plot(actuals[:limit], label='Actual', alpha=0.7)
+        plt.plot(predictions[:limit], label='Predicted', alpha=0.7)
+        plt.title(f'Actual vs Predicted (First {limit} samples)')
+    else:
+        plt.plot(actuals, label='Actual', alpha=0.7)
+        plt.plot(predictions, label='Predicted', alpha=0.7)
+        plt.title('Actual vs Predicted')
+        
+    plt.xlabel('Time Step')
+    plt.ylabel('MBT')
+    plt.legend()
+    plt.grid(True)
+    
+    import base64
+    from io import BytesIO
+    
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    buf.seek(0)
+    img_base64 = base64.b64encode(buf.read()).decode('utf-8')
+    
+    html_content = f"""
+    <html>
+    <head>
+        <title>Prediction Plot</title>
+    </head>
+    <body>
+        <h1>Actual vs Predicted</h1>
+        <img src="data:image/png;base64,{img_base64}" alt="Prediction Plot">
+    </body>
+    </html>
+    """
+    
+    import os
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    with open(output_path, 'w') as f:
+        f.write(html_content)
+    
+    print(f"Prediction plot saved to {output_path}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -217,6 +261,7 @@ if __name__ == "__main__":
     parser.add_argument('--model_dir', type=str, required=True)
     parser.add_argument('--metrics_output_path', type=str, required=True)
     parser.add_argument('--plot_output_path', type=str, required=False)
+    parser.add_argument('--prediction_plot_path', type=str, required=False)
     args = parser.parse_args()
 
     # 1. Load Data
@@ -228,13 +273,17 @@ if __name__ == "__main__":
     print(f"Total samples: {n}. Test starts at index: {test_start_idx}")
     
     # 3. Evaluate
-    mae = evaluate_gru(args.model_dir, raw_data, mbt, test_start_idx)
+    mae, actuals, predictions = evaluate_gru(args.model_dir, raw_data, mbt, test_start_idx)
     
     # 4. Plot Loss
     if args.plot_output_path:
         plot_loss(args.model_dir, args.plot_output_path)
+        
+    # 5. Plot Predictions
+    if args.prediction_plot_path:
+        plot_predictions(actuals, predictions, args.prediction_plot_path)
     
-    # 5. Save Metrics for Vertex AI
+    # 6. Save Metrics for Vertex AI
     metrics = {
         "metrics": [
             {
