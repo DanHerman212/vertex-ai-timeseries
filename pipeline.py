@@ -80,7 +80,7 @@ def evaluate_model_component(
     )
 
 # Helper component to attach serving metadata
-@dsl.component(base_image="python:3.10")
+@dsl.component(base_image="python:3.10", packages_to_install=["google-cloud-pipeline-components"])
 def attach_serving_spec(
     original_model: dsl.Input[artifact_types.UnmanagedContainerModel],
     model_with_spec: dsl.Output[artifact_types.UnmanagedContainerModel],

@@ -46,6 +46,9 @@ def evaluate_gru(model_dir, raw_data, mbt, test_start_idx, sequence_length=150):
         loaded_model = tf.saved_model.load(model_dir)
         inference_func = loaded_model.signatures["serving_default"]
         
+        print(f"Model inputs: {inference_func.structured_input_signature}")
+        print(f"Model outputs: {inference_func.structured_outputs}")
+
         # We need to wrap this to behave like model.predict() for the evaluation loop below
         # or adjust the evaluation loop.
         # Let's create a simple wrapper function.
@@ -54,7 +57,26 @@ def evaluate_gru(model_dir, raw_data, mbt, test_start_idx, sequence_length=150):
             # Convert to tensor
             input_tensor = tf.convert_to_tensor(input_data, dtype=tf.float32)
             # Run inference
-            output = inference_func(input_tensor)
+            # Try calling with positional argument first
+            try:
+                output = inference_func(input_tensor)
+            except Exception as e:
+                print(f"Positional call failed: {e}. Trying with keyword arguments...")
+                # If positional fails, try to find the input key
+                # structured_input_signature is a tuple: (args, kwargs)
+                # args is a tuple of TensorSpecs
+                # kwargs is a dict of TensorSpecs
+                # Usually for Keras models, it's in args[0] or kwargs
+                # But inference_func.structured_input_signature might be empty for some reason?
+                # Let's try to inspect the concrete function inputs
+                if hasattr(inference_func, 'inputs') and len(inference_func.inputs) > 0:
+                     # This is a bit hacky, but often the input tensor name is needed
+                     # But usually positional works for single input.
+                     # If it failed, maybe it expects a specific key.
+                     # Let's try 'inputs' or 'input_1' or 'args_0'
+                     # For now, re-raise to see the error in logs if we can't handle it
+                     raise e
+            
             # The output key is usually 'dense' or similar, or we take the first output
             # Let's inspect keys if needed, but usually it's the output layer name.
             # For a single output model, we can often just take the first value.
