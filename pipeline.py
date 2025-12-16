@@ -154,6 +154,11 @@ def gru_pipeline(
         input_csv=preprocess_task.outputs["output_csv"],
         model_dir=train_gru_task.outputs["model_dir"]
     )
+    # Assign GPU to evaluation task to support CudnnRNNV3 ops
+    evaluate_task.set_cpu_limit('4')
+    evaluate_task.set_memory_limit('16G')
+    evaluate_task.set_gpu_limit(1)
+    evaluate_task.set_accelerator_type('NVIDIA_TESLA_T4')
 
 if __name__ == "__main__":
     compiler.Compiler().compile(

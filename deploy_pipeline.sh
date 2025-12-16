@@ -32,7 +32,7 @@ PROJECT_ID=${PROJECT_ID:-"time-series-478616"}
 REGION=${REGION:-"us-east1"}
 REPO_NAME=${REPO_NAME:-"ml-pipelines"}
 IMAGE_NAME=${IMAGE_NAME:-"gru-training"}
-TAG=${TAG:-"v2"}
+TAG=${TAG:-"v5"}
 BUCKET_NAME=${BUCKET_NAME:-"time-series-478616-ml-pipeline"}
 BQ_QUERY=${BQ_QUERY:-'select
   arrival_date,
