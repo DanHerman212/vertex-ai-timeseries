@@ -1,0 +1,4 @@
+neuralforecast==1.6.4
+google-cloud-storage
+google-cloud-bigquery
+joblib
