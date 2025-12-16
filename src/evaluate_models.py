@@ -5,6 +5,8 @@ import os
 import json
 import joblib
 import tensorflow as tf
+import matplotlib
+matplotlib.use('Agg') # Set backend to Agg for headless environments
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_absolute_error
 from google.cloud import storage
@@ -26,6 +28,11 @@ def load_data_manual(input_path):
         mbt[i] = values[1] 
         raw_data[i, :] = values[:]
         
+    # Debug: Print stats
+    print(f"Data Loaded. Shape: {raw_data.shape}")
+    print(f"MBT Stats: Mean={np.mean(mbt):.2f}, Std={np.std(mbt):.2f}, Min={np.min(mbt):.2f}, Max={np.max(mbt):.2f}")
+    print(f"First 5 MBT values: {mbt[:5]}")
+    
     return mbt, raw_data
 
 def split_data_indices(n):
