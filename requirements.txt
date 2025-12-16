@@ -1,11 +1,11 @@
 neuralforecast
 pandas
 numpy
-google-cloud-storage
-google-cloud-aiplatform
-google-cloud-bigquery
+google-cloud-storage==2.13.0
+google-cloud-aiplatform==1.36.0
+google-cloud-bigquery==3.13.0
 db-dtypes
-kfp
+kfp==2.4.0
 pyarrow
 joblib
 scikit-learn
