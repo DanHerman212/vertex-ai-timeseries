@@ -213,13 +213,25 @@ if __name__ == "__main__":
     # 7. Save Model
     best_model_path = "optimized_gru.keras"
     final_path = os.path.join(args.model_dir, 'gru_model.keras')
-    if os.path.exists(best_model_path):
+    
+    # Helper to copy file safely across devices
+    def safe_copy(src, dst):
         import shutil
-        shutil.copy(best_model_path, final_path)
+        with open(src, 'rb') as f_src:
+            with open(dst, 'wb') as f_dst:
+                shutil.copyfileobj(f_src, f_dst)
+
+    if os.path.exists(best_model_path):
+        safe_copy(best_model_path, final_path)
         print(f"Best model copied to {final_path}")
     else:
-        model.save(final_path)
+        # Save to local temp first to avoid GCS fuse issues with direct save
+        temp_path = "temp_gru_model.keras"
+        model.save(temp_path)
+        safe_copy(temp_path, final_path)
         print(f"Model saved to {final_path}")
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
 
     # Upload if bucket provided
     if args.bucket_name:
