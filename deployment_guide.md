@@ -22,7 +22,7 @@ This guide outlines the workflow to train and deploy the NHITS (Neural Hierarchi
 
 ```bash
 export PROJECT_ID="your-project-id"
-export REGION="us-central1"
+export REGION="us-east1"
 export BUCKET_NAME="your-bucket-name"
 export IMAGE_URI="gcr.io/$PROJECT_ID/nhits-training:v1"
 ```
