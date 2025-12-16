@@ -117,62 +117,11 @@ def gru_pipeline(
     # train_gru_task.set_memory_limit('32G')
 
     # Step 4: Upload to Model Registry
-    # Note: For google-cloud-pipeline-components >= 2.0, the parameter is 'artifact_uri' or 'unmanaged_container_model'
-    # depending on the specific version. In v2.15+, 'unmanaged_container_model' is correct for ModelUploadOp.
-    # The parameter 'serving_container_image_uri' is not supported in newer versions of ModelUploadOp.
-    # Instead, we should use 'unmanaged_container_image_uri' or similar if available, or rely on the model artifact.
-    # However, checking the documentation for ModelUploadOp in v2.x, it seems we need to use 'unmanaged_container_model'
-    # and potentially other parameters.
-    # Let's try removing 'serving_container_image_uri' as it might be inferred or not strictly required in this form,
-    # or it might be named differently.
-    # Actually, looking at the error, 'serving_container_image_uri' is the issue.
-    # In newer versions, this might be passed differently.
-    # Let's try to use the 'unmanaged_container_model' which we already have, and see if we can omit the serving image for now
-    # or if there's a different parameter name.
-    # A common alternative is just passing the artifact.
-    # But wait, we need to specify the serving image.
-    # Let's check if 'unmanaged_container_model' is sufficient or if we need to use 'ModelUploadOp' differently.
-    # In v2+, ModelUploadOp is often replaced or used with specific parameters.
-    # Let's try to use the 'importer' component or just fix the parameter name.
-    # The parameter might be 'serving_container_image_uri' -> 'serving_container_image_uri' (no change?)
-    # Wait, the error says "unexpected keyword argument".
-    # Let's try to use the 'ModelUploadOp' from 'google_cloud_pipeline_components.v1.model' which we imported.
-    # It seems in v2.x, the arguments changed.
-    # Let's try to use the 'unmanaged_container_model' and remove 'serving_container_image_uri' to see if it compiles,
-    # but we really want to specify the serving image.
-    
-    # Correct approach for v2.x:
-    # The ModelUploadOp in v2.x might not support 'serving_container_image_uri' directly as a top-level arg if it's structured differently.
-    # However, a common issue is that 'serving_container_image_uri' was renamed or moved.
-    # Let's try to use 'unmanaged_container_model' and see if we can pass the image uri inside a structure or if there is a different arg.
-    # Actually, let's look at the 'ModelUploadOp' definition in v2.
-    # It seems 'serving_container_image_uri' is NOT a valid argument for 'ModelUploadOp' in the version installed.
-    
-    # Let's try to use the 'ModelUploadOp' with just the model and see if it works, or use a different component.
-    # But we need the serving image.
-    # Let's try 'unmanaged_container_model' and 'display_name'.
-    # If we need to specify the serving image, maybe we can do it via 'unmanaged_container_model' artifact metadata?
-    # Or maybe the parameter is 'serving_container_spec'?
-    
-    # Let's try to use the 'ModelUploadOp' with the correct parameters for v2.
-    # In v2, it seems we should use 'unmanaged_container_model' and 'display_name'.
-    # The serving container image might need to be part of the model artifact or passed differently.
-    # Let's try to remove 'serving_container_image_uri' and see if it compiles.
-    # If it compiles, we can then see if we can update the model later or if it defaults to something.
-    # But better, let's try to find the correct parameter.
-    # Some sources suggest 'serving_container_image_uri' is correct for v1, but for v2 it might be different.
-    # Let's try to use the 'google_cloud_pipeline_components.types.artifact_types.VertexModel' if possible?
-    # No, ModelUploadOp takes an artifact.
-    
-    # Let's try to use the 'ModelUploadOp' without 'serving_container_image_uri' and see if it works.
-    # If not, we might need to use a custom component or a different Op.
-    
     model_upload_task = ModelUploadOp(
         project=project_id,
         location=region,
         display_name=model_display_name,
         unmanaged_container_model=train_gru_task.outputs["model_dir"],
-        # serving_container_image_uri="us-docker.pkg.dev/vertex-ai/prediction/tf2-cpu.2-17:latest" # Removed causing error
     )
 
 
