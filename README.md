@@ -22,23 +22,33 @@ The repo is nearly complete and is expected to finish before the end of DEC 2025
 ## File Structure
 
 ```
-.
-├── deploy_pipeline.sh                 # Main orchestration script: builds Docker image, compiles pipeline, and submits job to Vertex AI
-├── pipeline.py                        # Kubeflow Pipeline (KFP) definition: defines steps (Extract -> Preprocess -> Train -> Evaluate) and resources (GPU)
-├── submit_pipeline.py                 # Python script to submit the compiled pipeline job using the Vertex AI SDK
-├── Dockerfile                         # Defines the container environment (TensorFlow, PyTorch, CUDA) used by all pipeline steps
-├── requirements.txt                   # Python dependencies installed inside the Docker container
-├── weather_data.csv                   # Historical weather data included in the image for feature engineering
-├── src/                               # Source code for individual pipeline components
-│   ├── extract.py                     # Step 1: Extracts raw data from BigQuery to CSV
-│   ├── preprocess.py                  # Step 2: Cleans data, removes outliers, and merges with weather data
-│   ├── train_gru.py                   # Step 3: Trains the GRU model on GPU and saves artifacts to GCS
-│   ├── train_model.py                 # Alternative training script (NHITS/N-BEATS)
-│   ├── evaluate_models.py             # Step 4: Evaluates model performance (MAE) on test set
-│   ├── prediction_utils.py            # Helper functions for generating predictions
-│   └── streaming_pipeline.py          # Logic for real-time/streaming inference
-└── training_and_preprocessing_workflows/ # Jupyter notebooks for initial experimentation and analysis
-    ├── nhits_training_workflow.ipynb  # Development notebook for NHITS model
-    ├── tensorflow_lstm_gru_workflow.ipynb # Development notebook for GRU/LSTM models
-    └── ml_dataset_preprocessing.ipynb # Data exploration and cleaning prototypes
-```
+nhits_gcp_workflow/
+├── deploy_pipeline.sh                  # Shell script to deploy the Vertex AI pipeline
+├── deployment_blockers_summary.md      # Summary of issues blocking deployment
+├── deployment_guide.md                 # Documentation guide for the deployment process
+├── Dockerfile                          # Default Dockerfile for the project
+├── Dockerfile.nhits                    # Dockerfile specifically for the NHITS model environment
+├── Dockerfile.serving                  # Dockerfile for the model serving container
+├── pipeline.py                         # Definition of the Vertex AI pipeline structure
+├── pipelines.png                       # Visual diagram of the pipeline architecture
+├── README.md                           # Project overview and instructions
+├── requirements.nhits.txt              # Python dependencies for NHITS training
+├── requirements.txt                    # General Python dependencies for the project
+├── submit_pipeline.py                  # Script to submit the pipeline job to Vertex AI
+├── text.sh                             # (Likely a utility or test shell script)
+├── weather_data.csv                    # Dataset used for training/testing
+├── src/                                # Source code for pipeline components
+│   ├── evaluate_models.py              # Component for evaluating trained models
+│   ├── extract.py                      # Component for data extraction
+│   ├── prediction_utils.py             # Utility functions for making predictions
+│   ├── preprocess.py                   # Component for data preprocessing
+│   ├── serve.py                        # Code for serving the model (e.g., Flask/FastAPI app)
+│   ├── streaming_pipeline.py           # Implementation of a streaming inference pipeline
+│   ├── train_gru.py                    # Training script for the GRU model
+│   └── train_nhits.py                  # Training script for the NHITS model
+└── training_and_preprocessing_workflows/ # Jupyter notebooks for experimentation
+    ├── ml_dataset_preprocessing.ipynb  # Notebook for exploring data preprocessing
+    ├── model_utils.py                  # Shared utilities for the notebooks
+    ├── nhits_training_workflow.ipynb   # Notebook for NHITS model development
+    └── tensorflow_lstm_gru_workflow.ipynb # Notebook for LSTM/GRU model development
+    ```
