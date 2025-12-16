@@ -1,32 +1,19 @@
 # ML Pipelines for Time Series Forecasting on Vertex AI
+## Challenger/Champion ML Workflow with NHITS and GRU Models
 This repository contains a complete machine learning pipeline for time series forecasting using NHITS and GRU models, deployed on Google Cloud Vertex AI. The pipeline is built with Kubeflow Pipelines (KFP) and leverages GPU resources for efficient model training.
+
+## Overview
+The pipeline consists of the following steps:
+1. **Extract**: Retrieve raw time series data from BigQuery 
+2. **Preprocess**: Clean the data, remove outliers, engineer features from weather, rolling regime and trigonomic functions cos and sin
+3. **Train**: Train both NHITS and GRU models using GPU
+4. **Evaluate**: Assess model performance using Mean Absolute Error (MAE) on a test dataset, selecting the best model as the champion
+
 
 The repo is nearly complete and is expected to finish before the end of DEC 2025.  Feel free to browse all the code and ask any questions.
 
-## Prerequisites
 
-Google Cloud SDK<br>
-Docker<br>
-Python 3.11<br>
-
-## Setup
-
-```bash
-gcloud auth login
-gcloud config set project <PROJECT_ID>
-```
-
-## Configuration
-
-Update variables in deploy_pipeline.sh
-
-## Execution
-
-```bash
-./deploy_pipeline.sh
-```
-
-## Project Structure
+## File Structure
 
 ```
 .
