@@ -8,7 +8,7 @@ This repo includes end to end pipelines for time series forecasting on Vertex AI
 
 ## Overview
 The pipeline consists of the following steps:
-1. **Extract**: Retrieve raw time series data from BigQuery 
+1. **Extract**: Retrieve time series data from BigQuery 
 2. **Preprocess**: Clean the data, remove outliers, engineer features from weather, rolling regime and trigonomic functions cos and sin
 3. **Train**: Train both NHITS and GRU models using GPU
 4. **Evaluate**: Assess model performance using Mean Absolute Error (MAE) on a test dataset, selecting the best model as the champion
