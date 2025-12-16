@@ -1,6 +1,6 @@
 # ML Pipelines for Time Series Forecasting on Vertex AI
 ## Challenger/Champion ML Workflow with NHITS and GRU Models
-This repository contains a complete machine learning pipeline for time series forecasting using NHITS and GRU models, deployed on Google Cloud Vertex AI. The pipeline is built with Kubeflow Pipelines (KFP) and leverages GPU resources for efficient model training.
+This repo includes end to end pipelines for time series forecasting on Vertex AI.  The pipeline trains 2 models, to compete against eachother on the same dataset.  The first is a traditional RNN using a stacked and regularlized GRU architecture.  The second is a state of the art transformer based model called NHITS, which has been shown to outperform many other models on standard benchmarks.  The pipeline is designed to run on Vertex AI using Kubeflow Pipelines (KFP) and leverages GPU acceleration for model training.
 
 ## Overview
 The pipeline consists of the following steps:
