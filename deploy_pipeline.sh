@@ -29,7 +29,7 @@ set -e
 # Configuration - Override these variables or set them in your environment
 # ==================================================================================
 PROJECT_ID=${PROJECT_ID:-"time-series-478616"}
-REGION=${REGION:-"us-east1"}
+REGION=${REGION:-"us-central1"}
 REPO_NAME=${REPO_NAME:-"ml-pipelines"}
 IMAGE_NAME=${IMAGE_NAME:-"gru-training"}
 TAG=${TAG:-"v1"}
@@ -42,7 +42,8 @@ from `mta_historical_v3.ml_cleaned`
 where extract(year from arrival_date) >= 2024'}
 
 # Derived Variables
-IMAGE_URI="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${IMAGE_NAME}:${TAG}"
+# Note: We keep the image in us-east1 to avoid re-pushing, but run the pipeline in the configured REGION (us-central1)
+IMAGE_URI="us-east1-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${IMAGE_NAME}:${TAG}"
 PIPELINE_ROOT="gs://${BUCKET_NAME}/pipeline_root"
 PIPELINE_JSON="gru_pipeline.json"
 
