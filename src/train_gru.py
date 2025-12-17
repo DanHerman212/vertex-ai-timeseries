@@ -191,6 +191,7 @@ if __name__ == "__main__":
     # Save Test Dataset if path provided
     if args.test_dataset_path:
         print(f"Saving test dataset to {args.test_dataset_path}...")
+        os.makedirs(os.path.dirname(args.test_dataset_path), exist_ok=True)
         test_ds.save(args.test_dataset_path)
     
     # 5. Build Model

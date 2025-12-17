@@ -79,6 +79,7 @@ def evaluate_nhits(model_dir, test_csv_path, metrics_output_path, plot_output_pa
         ]
     }
     
+    os.makedirs(os.path.dirname(metrics_output_path), exist_ok=True)
     with open(metrics_output_path, 'w') as f:
         json.dump(metrics, f)
     print(f"Metrics saved to {metrics_output_path}")

@@ -61,6 +61,7 @@ def train_and_save(model_dir, input_path, test_output_path=None):
     
     if test_output_path:
         print(f"Saving test dataframe to {test_output_path}...")
+        os.makedirs(os.path.dirname(test_output_path), exist_ok=True)
         test_df_export.to_csv(test_output_path, index=False)
     
     # Define Exogenous Variables

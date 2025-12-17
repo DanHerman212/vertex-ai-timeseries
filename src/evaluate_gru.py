@@ -239,6 +239,7 @@ if __name__ == "__main__":
         ]
     }
     
+    os.makedirs(os.path.dirname(args.metrics_output_path), exist_ok=True)
     with open(args.metrics_output_path, 'w') as f:
         json.dump(metrics, f)
     
