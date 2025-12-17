@@ -53,19 +53,21 @@ def preprocess_component(
 def train_gru_component(
     input_csv: dsl.Input[dsl.Dataset],
     model_dir: dsl.Output[artifact_types.UnmanagedContainerModel],
+    test_dataset: dsl.Output[dsl.Dataset],
 ):
     return dsl.ContainerSpec(
         image=TRAINING_IMAGE_URI,
         command=["python", "src/train_gru.py"],
         args=[
             "--input_csv", input_csv.path,
-            "--model_dir", model_dir.path
+            "--model_dir", model_dir.path,
+            "--test_dataset_path", test_dataset.path
         ]
     )
 
 @dsl.container_component
-def evaluate_model_component(
-    input_csv: dsl.Input[dsl.Dataset],
+def evaluate_gru_component(
+    test_dataset: dsl.Input[dsl.Dataset],
     model_dir: dsl.Input[artifact_types.UnmanagedContainerModel],
     metrics: dsl.Output[dsl.Metrics],
     loss_plot: dsl.Output[dsl.HTML],
@@ -73,9 +75,45 @@ def evaluate_model_component(
 ):
     return dsl.ContainerSpec(
         image=TRAINING_IMAGE_URI,
-        command=["python", "src/evaluate_models.py"],
+        command=["python", "src/evaluate_gru.py"],
+        args=[
+            "--test_dataset_path", test_dataset.path,
+            "--model_dir", model_dir.path,
+            "--metrics_output_path", metrics.path,
+            "--plot_output_path", loss_plot.path,
+            "--prediction_plot_path", prediction_plot.path
+        ]
+    )
+
+@dsl.container_component
+def train_nhits_component(
+    input_csv: dsl.Input[dsl.Dataset],
+    model_dir: dsl.Output[artifact_types.UnmanagedContainerModel],
+    test_csv: dsl.Output[dsl.Dataset],
+):
+    return dsl.ContainerSpec(
+        image=TRAINING_IMAGE_URI,
+        command=["python", "src/train_nhits.py"],
         args=[
             "--input_csv", input_csv.path,
+            "--model_dir", model_dir.path,
+            "--test_output_csv", test_csv.path
+        ]
+    )
+
+@dsl.container_component
+def evaluate_nhits_component(
+    test_csv: dsl.Input[dsl.Dataset],
+    model_dir: dsl.Input[artifact_types.UnmanagedContainerModel],
+    metrics: dsl.Output[dsl.Metrics],
+    loss_plot: dsl.Output[dsl.HTML],
+    prediction_plot: dsl.Output[dsl.HTML],
+):
+    return dsl.ContainerSpec(
+        image=TRAINING_IMAGE_URI,
+        command=["python", "src/evaluate_nhits.py"],
+        args=[
+            "--test_csv_path", test_csv.path,
             "--model_dir", model_dir.path,
             "--metrics_output_path", metrics.path,
             "--plot_output_path", loss_plot.path,
@@ -130,9 +168,12 @@ def gru_pipeline(
     train_gru_task.set_gpu_limit(1)
     train_gru_task.set_accelerator_type('NVIDIA_TESLA_T4')
     
-    # Fallback to CPU for now due to Quota issues
-    # train_gru_task.set_cpu_limit('8')
-    # train_gru_task.set_memory_limit('32G')
+    # Step 3b: Train N-HiTS
+    train_nhits_task = train_nhits_component(
+        input_csv=preprocess_task.outputs["output_csv"]
+    )
+    train_nhits_task.set_cpu_limit('8')
+    train_nhits_task.set_memory_limit('32G')
 
     # Step 3.5: Attach Serving Spec
     # We attach the serving container image URI to the model artifact metadata
@@ -151,16 +192,24 @@ def gru_pipeline(
     )
 
 
-    # Step 5: Evaluate
-    evaluate_task = evaluate_model_component(
-        input_csv=preprocess_task.outputs["output_csv"],
+    # Step 5: Evaluate GRU
+    evaluate_gru_task = evaluate_gru_component(
+        test_dataset=train_gru_task.outputs["test_dataset"],
         model_dir=train_gru_task.outputs["model_dir"]
     )
     # Assign GPU to evaluation task to support CudnnRNNV3 ops
-    evaluate_task.set_cpu_limit('4')
-    evaluate_task.set_memory_limit('16G')
-    evaluate_task.set_gpu_limit(1)
-    evaluate_task.set_accelerator_type('NVIDIA_TESLA_T4')
+    evaluate_gru_task.set_cpu_limit('4')
+    evaluate_gru_task.set_memory_limit('16G')
+    evaluate_gru_task.set_gpu_limit(1)
+    evaluate_gru_task.set_accelerator_type('NVIDIA_TESLA_T4')
+    
+    # Step 6: Evaluate N-HiTS
+    evaluate_nhits_task = evaluate_nhits_component(
+        test_csv=train_nhits_task.outputs["test_csv"],
+        model_dir=train_nhits_task.outputs["model_dir"]
+    )
+    evaluate_nhits_task.set_cpu_limit('4')
+    evaluate_nhits_task.set_memory_limit('16G')
 
 if __name__ == "__main__":
     compiler.Compiler().compile(

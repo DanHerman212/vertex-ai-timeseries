@@ -11,39 +11,7 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import mean_absolute_error
 from google.cloud import storage
 
-def load_data_manual(input_path):
-    print(f"Loading data from {input_path}...")
-    with open(input_path) as f:
-        data = f.read()
-    lines = [line for line in data.split("\n") if line.strip()]
-    header = lines[0].split(",")
-    lines = lines[1:]
-    
-    mbt = np.zeros((len(lines),))
-    # raw_data excludes the first column (date)
-    raw_data = np.zeros((len(lines), len(header) - 1))
-    
-    for i, line in enumerate(lines):
-        values = [float(x) for x in line.split(",")[1:]]
-        mbt[i] = values[1] 
-        raw_data[i, :] = values[:]
-        
-    # Debug: Print stats
-    print(f"Data Loaded. Shape: {raw_data.shape}")
-    print(f"MBT Stats: Mean={np.mean(mbt):.2f}, Std={np.std(mbt):.2f}, Min={np.min(mbt):.2f}, Max={np.max(mbt):.2f}")
-    print(f"First 5 MBT values: {mbt[:5]}")
-    
-    return mbt, raw_data
-
-def split_data_indices(n):
-    num_train_samples = int(0.6 * n)
-    num_val_samples = int(0.2 * n)
-    num_test_samples = n - num_train_samples - num_val_samples
-    
-    test_start_idx = num_train_samples + num_val_samples
-    return test_start_idx
-
-def evaluate_gru(model_dir, raw_data, mbt, test_start_idx, sequence_length=150):
+def evaluate_gru(model_dir, test_ds):
     print("Evaluating GRU Model...")
     # Check for SavedModel format (directory) or Keras file
     if os.path.isdir(model_dir) and os.path.exists(os.path.join(model_dir, "saved_model.pb")):
@@ -105,35 +73,6 @@ def evaluate_gru(model_dir, raw_data, mbt, test_start_idx, sequence_length=150):
              except:
                 raise FileNotFoundError(f"Could not find valid model at {model_dir}")
 
-    scaler_path = os.path.join(model_dir, "scaler.pkl")
-    if not os.path.exists(scaler_path):
-        raise FileNotFoundError(f"Scaler not found at {scaler_path}")
-    
-    # Load Scaler
-    scaler = joblib.load(scaler_path)
-    train_mean = scaler['mean']
-    train_std = scaler['std']
-    
-    # Scale Data
-    raw_data_scaled = (raw_data - train_mean) / train_std
-    
-    # Prepare Test Data (Sliding Window)
-    # We need to start 'sequence_length' steps before the test_start_idx to predict the first test point
-    start_idx = test_start_idx - sequence_length
-    
-    if start_idx < 0:
-        raise ValueError("Not enough data history for the first test point.")
-
-    # Create dataset
-    test_ds = tf.keras.utils.timeseries_dataset_from_array(
-        data=raw_data_scaled[start_idx:-1], # Input up to the last point
-        targets=mbt[test_start_idx:],       # Targets starting from test_start_idx
-        sequence_length=sequence_length,
-        sampling_rate=1,
-        batch_size=128,
-        shuffle=False
-    )
-    
     # Predict
     print("Generating predictions...")
     # Use the wrapper or the model.predict method
@@ -262,7 +201,7 @@ def plot_predictions(actuals, predictions, output_path):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input_csv', type=str, required=True)
+    parser.add_argument('--test_dataset_path', type=str, required=True)
     parser.add_argument('--model_dir', type=str, required=True)
     parser.add_argument('--metrics_output_path', type=str, required=True)
     parser.add_argument('--plot_output_path', type=str, required=False)
@@ -270,25 +209,21 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # 1. Load Data
-    mbt, raw_data = load_data_manual(args.input_csv)
+    print(f"Loading test dataset from {args.test_dataset_path}...")
+    test_ds = tf.data.Dataset.load(args.test_dataset_path)
     
-    # 2. Determine Split
-    n = len(raw_data)
-    test_start_idx = split_data_indices(n)
-    print(f"Total samples: {n}. Test starts at index: {test_start_idx}")
+    # 2. Evaluate
+    mae, actuals, predictions = evaluate_gru(args.model_dir, test_ds)
     
-    # 3. Evaluate
-    mae, actuals, predictions = evaluate_gru(args.model_dir, raw_data, mbt, test_start_idx)
-    
-    # 4. Plot Loss
+    # 3. Plot Loss
     if args.plot_output_path:
         plot_loss(args.model_dir, args.plot_output_path)
         
-    # 5. Plot Predictions
+    # 4. Plot Predictions
     if args.prediction_plot_path:
         plot_predictions(actuals, predictions, args.prediction_plot_path)
     
-    # 6. Save Metrics for Vertex AI
+    # 5. Save Metrics for Vertex AI
     metrics = {
         "metrics": [
             {

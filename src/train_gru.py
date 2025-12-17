@@ -171,6 +171,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--input_csv', type=str, required=True, help='Path to input CSV file')
     parser.add_argument('--model_dir', type=str, default='gru_model', help='Local directory to save model')
+    parser.add_argument('--test_dataset_path', type=str, required=False, help='Path to save test dataset')
     args = parser.parse_args()
 
     # 1. Load Data
@@ -184,6 +185,11 @@ if __name__ == "__main__":
     
     # 4. Create Datasets
     train_ds, val_ds, test_ds = create_datasets(raw_data_scaled, mbt, num_train, num_val)
+    
+    # Save Test Dataset if path provided
+    if args.test_dataset_path:
+        print(f"Saving test dataset to {args.test_dataset_path}...")
+        test_ds.save(args.test_dataset_path)
     
     # 5. Build Model
     input_shape = (150, raw_data_scaled.shape[1])
