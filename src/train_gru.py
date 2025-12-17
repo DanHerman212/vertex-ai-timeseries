@@ -60,7 +60,7 @@ def scale_data(raw_data, num_train_samples):
     
     return raw_data_scaled, train_mean, train_std
 
-def create_datasets(raw_data, mbt, num_train_samples, num_val_samples, sequence_length=150, batch_size=128):
+def create_datasets(raw_data, mbt, num_train_samples, num_val_samples, sequence_length=150, batch_size=256):
     # Train Dataset
     train_dataset = keras.utils.timeseries_dataset_from_array(
         data=raw_data[:-sequence_length],
@@ -147,14 +147,21 @@ def build_optimized_gru_model(input_shape):
     inputs = keras.Input(shape=input_shape)
 
     # Layer 1: GRU
+    # Removed L2 Regularization as requested
     x = layers.GRU(64, return_sequences=True)(inputs)
+    x = layers.LayerNormalization()(x) # Added for stability
+    x = layers.SpatialDropout1D(0.3)(x) # Better for sequences than standard Dropout
+    
+    # Layer 2: GRU
+    x = layers.GRU(64, return_sequences=True)(x)
     x = layers.LayerNormalization()(x)
     x = layers.SpatialDropout1D(0.3)(x)
-
-    # Layer 2: GRU
+    
+    # Layer 3: GRU
     x = layers.GRU(32, return_sequences=False)(x)
     x = layers.LayerNormalization()(x)
     x = layers.Dropout(0.2)(x)
+    
 
     # Dense Head
     outputs = layers.Dense(1)(x)

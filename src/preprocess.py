@@ -13,7 +13,7 @@ def preprocess_data(input_path, output_path):
     df = pd.read_csv(input_path)
     
     # Validate expected schema from BigQuery
-    required_columns = ['arrival_date', 'duration', 'mbt']
+    required_columns = ['arrival_date', 'duration', 'mbt',]
     missing_columns = [col for col in required_columns if col not in df.columns]
     if missing_columns:
         raise ValueError(f"Input data is missing required columns: {missing_columns}. Expected columns: {required_columns}")
@@ -105,11 +105,6 @@ def preprocess_data(input_path, output_path):
         df = df.rename(columns={'arrival_date': 'ds', 'mbt': 'y'})
     elif 'ds' in df.columns:
         df['ds'] = pd.to_datetime(df['ds'])
-    
-    # Filter years if needed (from TF notebook)
-    df['year'] = df['ds'].dt.year
-    df = df[df['year'].isin([2024, 2025])].copy()
-    df = df.drop(columns=['year'])
 
     # --- Feature Engineering (Universal) ---
     print("Generating features...")
