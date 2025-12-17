@@ -84,6 +84,10 @@ def preprocess_data(input_path, output_path):
                 # Round train arrival time to the nearest hour to match weather data
                 df['weather_join_key'] = df['arrival_date'].dt.round('h')
                 
+                # Ensure join key is timezone-naive to match weather data (BigQuery is UTC, CSV is naive)
+                if df['weather_join_key'].dt.tz is not None:
+                    df['weather_join_key'] = df['weather_join_key'].dt.tz_localize(None)
+                
                 # 6. Merge
                 # Left join ensures we keep all train trips
                 df = pd.merge(df, weather_df, left_on='weather_join_key', right_on='datetime', how='left')
