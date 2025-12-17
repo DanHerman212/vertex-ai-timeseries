@@ -83,10 +83,26 @@ else
     gcloud builds submit --tag $TENSORFLOW_IMAGE_URI .
     
     echo "Building PyTorch Training Image..."
-    gcloud builds submit --tag $PYTORCH_IMAGE_URI -f Dockerfile.nhits .
-    
+    gcloud builds submit --tag $PYTORCH_IMAGE_URI --config <(echo "steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '-t', '$_IMAGE_URI', '-f', '$_DOCKERFILE', '.']
+images:
+- '$_IMAGE_URI'
+substitutions:
+  _IMAGE_URI: '$PYTORCH_IMAGE_URI'
+  _DOCKERFILE: 'Dockerfile.nhits'
+") .
+
     echo "Building PyTorch Serving Image..."
-    gcloud builds submit --tag $PYTORCH_SERVING_IMAGE_URI -f Dockerfile.serving .
+    gcloud builds submit --tag $PYTORCH_SERVING_IMAGE_URI --config <(echo "steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '-t', '$_IMAGE_URI', '-f', '$_DOCKERFILE', '.']
+images:
+- '$_IMAGE_URI'
+substitutions:
+  _IMAGE_URI: '$PYTORCH_SERVING_IMAGE_URI'
+  _DOCKERFILE: 'Dockerfile.serving'
+") .
 fi
 
 # 2. Compile Pipeline
