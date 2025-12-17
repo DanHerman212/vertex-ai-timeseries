@@ -46,9 +46,30 @@ where extract(year from arrival_date) >= 2024'}
 
 # Derived Variables
 # Note: We keep the image in us-east1 to avoid re-pushing, but run the pipeline in the configured REGION (us-east1)
-TENSORFLOW_IMAGE_URI="us-east1-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${TENSORFLOW_IMAGE_NAME}:${TAG}"
-PYTORCH_IMAGE_URI="us-east1-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${PYTORCH_IMAGE_NAME}:${TAG}"
-PYTORCH_SERVING_IMAGE_URI="us-east1-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${PYTORCH_SERVING_IMAGE_NAME}:${TAG}"
+if [ -z "$TENSORFLOW_IMAGE_URI" ]; then
+    TENSORFLOW_IMAGE_URI="us-east1-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${TENSORFLOW_IMAGE_NAME}:${TAG}"
+    SHOULD_BUILD_TF=true
+else
+    echo "Using provided TENSORFLOW_IMAGE_URI: $TENSORFLOW_IMAGE_URI"
+    SHOULD_BUILD_TF=false
+fi
+
+if [ -z "$PYTORCH_IMAGE_URI" ]; then
+    PYTORCH_IMAGE_URI="us-east1-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${PYTORCH_IMAGE_NAME}:${TAG}"
+    SHOULD_BUILD_PYTORCH=true
+else
+    echo "Using provided PYTORCH_IMAGE_URI: $PYTORCH_IMAGE_URI"
+    SHOULD_BUILD_PYTORCH=false
+fi
+
+if [ -z "$PYTORCH_SERVING_IMAGE_URI" ]; then
+    PYTORCH_SERVING_IMAGE_URI="us-east1-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${PYTORCH_SERVING_IMAGE_NAME}:${TAG}"
+    SHOULD_BUILD_SERVING=true
+else
+    echo "Using provided PYTORCH_SERVING_IMAGE_URI: $PYTORCH_SERVING_IMAGE_URI"
+    SHOULD_BUILD_SERVING=false
+fi
+
 PIPELINE_ROOT="gs://${BUCKET_NAME}/pipeline_root"
 PIPELINE_JSON="forecasting_pipeline.json"
 
@@ -79,8 +100,12 @@ else
     echo ""
     echo "[1/3] Building and Pushing Docker Images..."
     
-    echo "Building TensorFlow Training Image..."
-    gcloud builds submit --tag $TENSORFLOW_IMAGE_URI .
+    if [ "$SHOULD_BUILD_TF" = true ]; then
+        echo "Building TensorFlow Training Image..."
+        gcloud builds submit --tag $TENSORFLOW_IMAGE_URI .
+    else
+        echo "Skipping TensorFlow build. Using provided URI: $TENSORFLOW_IMAGE_URI"
+    fi
     
     # --------------------------------------------------------------------------
     # Build 2: PyTorch Training Image
@@ -90,8 +115,9 @@ else
     # Below, we use "Process Substitution" <(...) to pass an inline YAML config.
     # We also add a 'docker pull' step to enable caching (--cache-from), which
     # significantly speeds up subsequent builds.
-    echo "Building PyTorch Training Image..."
-    gcloud builds submit --config <(echo "steps:
+    if [ "$SHOULD_BUILD_PYTORCH" = true ]; then
+        echo "Building PyTorch Training Image..."
+        gcloud builds submit --config <(echo "steps:
 - name: 'gcr.io/cloud-builders/docker'
   entrypoint: 'bash'
   args: ['-c', 'docker pull \$_IMAGE_URI || exit 0']
@@ -104,13 +130,17 @@ substitutions:
   _IMAGE_URI: '$PYTORCH_IMAGE_URI'
   _DOCKERFILE: 'Dockerfile.nhits'
 ") .
+    else
+        echo "Skipping PyTorch build. Using provided URI: $PYTORCH_IMAGE_URI"
+    fi
 
     # --------------------------------------------------------------------------
     # Build 3: PyTorch Serving Image
     # --------------------------------------------------------------------------
     # Same technique as above, but pointing to Dockerfile.serving
-    echo "Building PyTorch Serving Image..."
-    gcloud builds submit --config <(echo "steps:
+    if [ "$SHOULD_BUILD_SERVING" = true ]; then
+        echo "Building PyTorch Serving Image..."
+        gcloud builds submit --config <(echo "steps:
 - name: 'gcr.io/cloud-builders/docker'
   entrypoint: 'bash'
   args: ['-c', 'docker pull \$_IMAGE_URI || exit 0']
@@ -122,6 +152,9 @@ substitutions:
   _IMAGE_URI: '$PYTORCH_SERVING_IMAGE_URI'
   _DOCKERFILE: 'Dockerfile.serving'
 ") .
+    else
+        echo "Skipping PyTorch Serving build. Using provided URI: $PYTORCH_SERVING_IMAGE_URI"
+    fi
 fi
 
 # 2. Compile Pipeline
