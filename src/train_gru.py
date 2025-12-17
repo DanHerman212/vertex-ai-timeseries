@@ -204,6 +204,10 @@ if __name__ == "__main__":
     # 7. Save Model (SavedModel format for Vertex AI)
     best_model_path = "optimized_gru.keras"
     
+    # Ensure output directory exists
+    if not os.path.exists(args.model_dir):
+        os.makedirs(args.model_dir)
+
     if os.path.exists(best_model_path):
         print(f"Loading best model from {best_model_path}...")
         best_model = keras.models.load_model(best_model_path)

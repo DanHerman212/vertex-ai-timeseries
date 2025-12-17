@@ -113,7 +113,7 @@ def evaluate_nhits_component(
         image=TRAINING_IMAGE_URI,
         command=["python", "src/evaluate_nhits.py"],
         args=[
-            "--test_csv_path", test_csv.path,
+            "--test_dataset_path", test_csv.path,
             "--model_dir", model_dir.path,
             "--metrics_output_path", metrics.path,
             "--plot_output_path", loss_plot.path,
