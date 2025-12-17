@@ -88,11 +88,16 @@ else
     # Note: 'gcloud builds submit' does not support the '-f' flag to specify a 
     # Dockerfile directly. We must use a Cloud Build configuration (YAML).
     # Below, we use "Process Substitution" <(...) to pass an inline YAML config.
+    # We also add a 'docker pull' step to enable caching (--cache-from), which
+    # significantly speeds up subsequent builds.
     echo "Building PyTorch Training Image..."
     gcloud builds submit --config <(echo "steps:
 - name: 'gcr.io/cloud-builders/docker'
-  # This step runs: docker build -t \$_IMAGE_URI -f \$_DOCKERFILE .
-  args: ['build', '-t', '\$_IMAGE_URI', '-f', '\$_DOCKERFILE', '.']
+  entrypoint: 'bash'
+  args: ['-c', 'docker pull \$_IMAGE_URI || exit 0']
+- name: 'gcr.io/cloud-builders/docker'
+  # This step runs: docker build --cache-from \$_IMAGE_URI -t \$_IMAGE_URI -f \$_DOCKERFILE .
+  args: ['build', '--cache-from', '\$_IMAGE_URI', '-t', '\$_IMAGE_URI', '-f', '\$_DOCKERFILE', '.']
 images:
 - '\$_IMAGE_URI'
 substitutions:
@@ -107,7 +112,10 @@ substitutions:
     echo "Building PyTorch Serving Image..."
     gcloud builds submit --config <(echo "steps:
 - name: 'gcr.io/cloud-builders/docker'
-  args: ['build', '-t', '\$_IMAGE_URI', '-f', '\$_DOCKERFILE', '.']
+  entrypoint: 'bash'
+  args: ['-c', 'docker pull \$_IMAGE_URI || exit 0']
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '--cache-from', '\$_IMAGE_URI', '-t', '\$_IMAGE_URI', '-f', '\$_DOCKERFILE', '.']
 images:
 - '\$_IMAGE_URI'
 substitutions:

@@ -3,7 +3,7 @@
 This repo includes end to end pipelines for time series forecasting on Vertex AI.  The pipeline trains two models, to compete against eachother on the same dataset.  The first is a traditional RNN using a stacked and regularlized GRU architecture with TensorFlow and Keras.  The second is a N-HiTS model, which is a state of the art multi-stack MLP, that uses hierarchical interpolation and multi-rate sampling to handle different timescales, deployed with NeuralForecast.  The pipeline is designed to run on Vertex AI using Kubeflow Pipelines (KFP) and leverages GPU acceleration for model training.
 
 <div align="center">
-  <img src="pipelines.png" alt="Image Description" width="500">
+  <img src="images/forecasting_pipeline.png" alt="Image Description">
 </div>
 
 ## Overview
