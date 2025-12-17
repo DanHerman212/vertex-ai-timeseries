@@ -13,7 +13,7 @@ def preprocess_data(input_path, output_path):
     df = pd.read_csv(input_path)
     
     # Validate expected schema from BigQuery
-    required_columns = ['arrival_date', 'duration', 'mbt',]
+    required_columns = ['arrival_date', 'duration', 'mbt', 'dow']
     missing_columns = [col for col in required_columns if col not in df.columns]
     if missing_columns:
         raise ValueError(f"Input data is missing required columns: {missing_columns}. Expected columns: {required_columns}")
