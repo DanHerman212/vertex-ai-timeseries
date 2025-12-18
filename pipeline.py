@@ -230,6 +230,8 @@ def forecasting_pipeline(
     )
     evaluate_nhits_task.set_cpu_limit('4')
     evaluate_nhits_task.set_memory_limit('16G')
+    evaluate_nhits_task.set_gpu_limit(1)
+    evaluate_nhits_task.set_accelerator_type('NVIDIA_TESLA_T4')
 
 if __name__ == "__main__":
     compiler.Compiler().compile(
