@@ -138,6 +138,7 @@ def preprocess_data(input_path, output_path):
     # Fill NaNs
     df = df.bfill()
 
+    print(f"Final columns: {df.columns.tolist()}")
     # print(f"Saving processed data to {output_path}...")
     # # Ensure directory exists
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
