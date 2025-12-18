@@ -159,6 +159,8 @@ def forecasting_pipeline(
     preprocess_task = preprocess_component(
         input_csv=extract_task.outputs["output_dataset"]
     )
+    # Disable caching to ensure we pick up the latest code changes in the image
+    preprocess_task.set_caching_options(False)
     
     # Step 3: Train GRU
     train_gru_task = train_gru_component(
