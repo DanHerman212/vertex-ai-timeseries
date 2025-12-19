@@ -2,6 +2,7 @@ import os
 import argparse
 import pandas as pd
 import numpy as np
+import torch
 from neuralforecast import NeuralForecast
 from neuralforecast.models import NHITS
 from neuralforecast.losses.pytorch import MAE, MQLoss
@@ -55,9 +56,14 @@ def train_and_save(model_dir, input_path, test_output_path=None):
     # Create Test DataFrame for export
     # IMPORTANT: We include the lookback window (input_size=150) so the model has context
     # for the first prediction in the test set.
+    # We also add a buffer (e.g. 20 steps) to allow for validation splits during evaluation
+    # (since evaluate_nhits.py uses val_size=10, we need at least input_size + val_size history)
     input_size = 150
-    start_idx = max(0, train_size + val_size - input_size)
+    buffer_size = 20
+    start_idx = max(0, train_size + val_size - input_size - buffer_size)
+    print(f"DEBUG: input_size={input_size}, buffer_size={buffer_size}, start_idx={start_idx}")
     test_df_export = Y_df.iloc[start_idx:]
+    print(f"DEBUG: test_df_export length={len(test_df_export)}")
     
     if test_output_path:
         print(f"Saving test dataframe to {test_output_path}...")
@@ -92,7 +98,7 @@ def train_and_save(model_dir, input_path, test_output_path=None):
             learning_rate=1e-3,
             n_pool_kernel_size=[2, 2, 2], 
             n_freq_downsample=[168, 24, 1],
-            accelerator="gpu", # Use CPU for now to match container, or "gpu" if available
+            accelerator="gpu" if torch.cuda.is_available() else "cpu",
             logger=logger      # Pass logger to capture history
         )
     ]

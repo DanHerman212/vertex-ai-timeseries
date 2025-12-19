@@ -1,0 +1,25 @@
+FROM python:3.10-slim
+
+WORKDIR /app
+
+# Install system dependencies for plotting (matplotlib)
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv
+RUN pip install uv
+
+# Copy requirements
+COPY requirements.nhits.txt .
+# Install torch < 2.6 to avoid weights_only=True default in 2.6+ which breaks NeuralForecast loading
+RUN uv pip install --system "torch<2.6"
+# Add pandas/matplotlib explicitly if not in requirements (they usually are dependencies but good to be safe)
+RUN uv pip install --system --no-cache -r requirements.nhits.txt pandas matplotlib
+
+# Copy source code
+COPY src/ src/
+COPY weather_data.csv .
+
+# Default command
+CMD ["bash"]

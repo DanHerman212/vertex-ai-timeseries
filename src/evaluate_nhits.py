@@ -52,12 +52,15 @@ def evaluate_nhits(model_dir, test_csv_path, metrics_output_path, plot_output_pa
     # Calculate the number of steps to predict
     # The test_df contains [lookback_window + actual_test_data]
     # We want to predict the actual_test_data
-    n_test_steps = len(test_df) - input_size
+    # We must also account for the validation set (val_size=10) used in cross_validation
+    # AND ensure we have strictly more than input_size for the training window
+    val_size = 10
+    n_test_steps = len(test_df) - input_size - val_size - 5
     print(f"Total rows in test_df: {len(test_df)}", flush=True)
     print(f"Expected test steps: {n_test_steps}", flush=True)
     
     if n_test_steps <= 0:
-        raise ValueError(f"Test dataframe is too small ({len(test_df)}) for input_size ({input_size}).")
+        raise ValueError(f"Test dataframe is too small ({len(test_df)}) for input_size ({input_size}) + val_size ({val_size}).")
         
     # SMOKE TEST: Try to predict just 2 steps first to verify everything works
     # Removed smoke test as it was failing for the same reason (val_size=0).
@@ -72,7 +75,7 @@ def evaluate_nhits(model_dir, test_csv_path, metrics_output_path, plot_output_pa
         # This mimics the behavior in the training notebook where a validation set is present.
         forecasts = nf.cross_validation(
             df=test_df,
-            val_size=10, 
+            val_size=val_size, 
             test_size=n_test_steps,
             n_windows=None,
             step_size=1
