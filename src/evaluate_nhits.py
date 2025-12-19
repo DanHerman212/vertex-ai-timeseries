@@ -277,44 +277,39 @@ def plot_loss(model_dir, output_path):
     save_plot_html(output_path, "Training Loss")
 
 def plot_predictions(forecasts_df, output_path):
-    plt.figure(figsize=(15, 6))
+    # Create figure with GridSpec layout
+    fig = plt.figure(figsize=(16, 12))
+    gs = fig.add_gridspec(2, 2)
     
-    # Plot a subset if too large
+    # --- Plot 1: Time Series (First 500 samples) ---
+    ax1 = fig.add_subplot(gs[0, :])
+    
     limit = 500
     plot_df = forecasts_df.iloc[:limit]
     
-    # Plot Actuals (Black, solid)
-    plt.plot(plot_df['ds'], plot_df['y'], label='Actual', color='black', linewidth=1.5, alpha=1.0)
+    # Plot Actuals
+    ax1.plot(plot_df['ds'], plot_df['y'], label='Actual', color='black', linewidth=1.5, alpha=1.0)
     
-    # Check for median or default
-    y_pred_col = 'NHITS-median' if 'NHITS-median' in plot_df.columns else 'NHITS'
-    
-    # If we renamed columns in eval_df, they might not be in forecasts_df passed here
-    # Let's ensure we are plotting the right thing.
-    if y_pred_col not in plot_df.columns:
-         # Fallback to finding any column starting with NHITS that isn't lo/hi
-         candidates = [c for c in plot_df.columns if c.startswith('NHITS') and '-lo-' not in c and '-hi-' not in c]
+    # Identify Prediction Column
+    y_pred_col = 'NHITS-median' if 'NHITS-median' in forecasts_df.columns else 'NHITS'
+    if y_pred_col not in forecasts_df.columns:
+         candidates = [c for c in forecasts_df.columns if c.startswith('NHITS') and '-lo-' not in c and '-hi-' not in c]
          if candidates:
              y_pred_col = candidates[0]
     
-    # Plot Predicted (Blue, slightly transparent to show overlaps)
-    plt.plot(plot_df['ds'], plot_df[y_pred_col], label='Predicted', color='blue', linewidth=1.5, alpha=0.7)
+    # Plot Predicted
+    ax1.plot(plot_df['ds'], plot_df[y_pred_col], label='Predicted', color='blue', linewidth=1.5, alpha=0.7)
     
-    # Plot Confidence Intervals if available
-    # Note: We renamed columns for utilsforecast earlier, but forecasts_df might still have original names
-    # or we might need to check for the renamed versions.
-    
+    # Plot Confidence Intervals
     lo_col = None
     hi_col = None
-    
     if 'NHITS-lo-80.0' in plot_df.columns: lo_col = 'NHITS-lo-80.0'
     elif 'NHITS-lo-80' in plot_df.columns: lo_col = 'NHITS-lo-80'
-    
     if 'NHITS-hi-80.0' in plot_df.columns: hi_col = 'NHITS-hi-80.0'
     elif 'NHITS-hi-80' in plot_df.columns: hi_col = 'NHITS-hi-80'
 
     if lo_col and hi_col:
-        plt.fill_between(
+        ax1.fill_between(
             plot_df['ds'], 
             plot_df[lo_col], 
             plot_df[hi_col], 
@@ -323,13 +318,75 @@ def plot_predictions(forecasts_df, output_path):
             label='80% Confidence Interval'
         )
         
-    plt.title(f'Subway Headway Prediction: Actual vs Predicted (First {limit} samples)')
-    plt.xlabel('Time')
-    plt.ylabel('Minutes Between Trains (MBT)')
-    plt.legend()
-    plt.grid(True)
+    ax1.set_title(f'Subway Headway Prediction: Actual vs Predicted (First {limit} samples)')
+    ax1.set_xlabel('Time')
+    ax1.set_ylabel('Minutes Between Trains (MBT)')
+    ax1.legend()
+    ax1.grid(True)
+
+    # --- Prepare Data for Density/Residuals (Use Full Dataset) ---
+    actuals = forecasts_df['y'].values
+    predictions = forecasts_df[y_pred_col].values
+    residuals = actuals - predictions
+
+    # --- Plot 2: Distribution of Actual vs Predicted ---
+    ax2 = fig.add_subplot(gs[1, 0])
+    try:
+        density_actual = gaussian_kde(actuals)
+        density_pred = gaussian_kde(predictions)
+        
+        min_val = min(actuals.min(), predictions.min())
+        max_val = max(actuals.max(), predictions.max())
+        padding = (max_val - min_val) * 0.1
+        xs = np.linspace(min_val - padding, max_val + padding, 200)
+        
+        ax2.plot(xs, density_actual(xs), color='green', label='Actual')
+        ax2.fill_between(xs, density_actual(xs), color='green', alpha=0.3)
+        
+        ax2.plot(xs, density_pred(xs), color='orange', label='Predicted')
+        ax2.fill_between(xs, density_pred(xs), color='orange', alpha=0.3)
+    except Exception as e:
+        print(f"KDE Error: {e}")
+        ax2.hist(actuals, bins=30, density=True, alpha=0.5, color='green', label='Actual')
+        ax2.hist(predictions, bins=30, density=True, alpha=0.5, color='orange', label='Predicted')
+        
+    ax2.set_title('Distribution of Actual vs Predicted Values')
+    ax2.set_xlabel('Value')
+    ax2.set_ylabel('Density')
+    ax2.legend()
+    ax2.grid(True, alpha=0.3)
+
+    # --- Plot 3: Residuals ---
+    ax3 = fig.add_subplot(gs[1, 1])
     
-    save_plot_html(output_path, "Prediction Plot")
+    # Histogram
+    counts, bins, patches = ax3.hist(residuals, bins=30, density=False, color='purple', alpha=0.6, edgecolor='black')
+    
+    # KDE for residuals
+    try:
+        density_res = gaussian_kde(residuals)
+        min_res = residuals.min()
+        max_res = residuals.max()
+        padding_res = (max_res - min_res) * 0.1
+        xs_res = np.linspace(min_res - padding_res, max_res + padding_res, 200)
+        
+        curve = density_res(xs_res)
+        bin_width = bins[1] - bins[0]
+        scale_factor = len(residuals) * bin_width
+        
+        ax3.plot(xs_res, curve * scale_factor, color='purple', linewidth=2)
+    except:
+        pass
+    
+    ax3.axvline(x=0, color='black', linestyle='--', linewidth=2)
+    ax3.set_title('Distribution of Prediction Errors (Residuals)')
+    ax3.set_xlabel('Error (Actual - Predicted)')
+    ax3.set_ylabel('Count')
+    ax3.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    
+    save_plot_html(output_path, "Model Evaluation Report")
 
 def save_plot_html(output_path, title):
     import base64
