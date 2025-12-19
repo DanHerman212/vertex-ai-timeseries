@@ -282,7 +282,7 @@ def plot_predictions(forecasts_df, output_path):
     limit = 500
     plot_df = forecasts_df.iloc[:limit]
     
-    plt.plot(plot_df['ds'], plot_df['y'], label='Actual MBT', color='black', alpha=0.7)
+    plt.plot(plot_df['ds'], plot_df['y'], label='Actual', color='black', alpha=0.7)
     
     # Check for median or default
     y_pred_col = 'NHITS-median' if 'NHITS-median' in plot_df.columns else 'NHITS'
@@ -295,7 +295,7 @@ def plot_predictions(forecasts_df, output_path):
          if candidates:
              y_pred_col = candidates[0]
     
-    plt.plot(plot_df['ds'], plot_df[y_pred_col], label='Predicted Median MBT', color='blue', linewidth=2)
+    plt.plot(plot_df['ds'], plot_df[y_pred_col], label='Predicted', color='blue', linewidth=2)
     
     # Plot Confidence Intervals if available
     # Note: We renamed columns for utilsforecast earlier, but forecasts_df might still have original names

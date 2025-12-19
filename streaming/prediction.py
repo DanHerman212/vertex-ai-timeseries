@@ -79,11 +79,13 @@ class VertexAIPrediction(beam.DoFn):
         element: {
             'key': 'Route_Stop',
             'timestamps': [ts1, ts2, ...],
+            'durations': [d1, d2, ...],
             'last_timestamp': ts_last
         }
         """
         key = element['key']
         timestamps = sorted(element['timestamps'])
+        durations = element.get('durations', [])
         
         if len(timestamps) < 2:
             logging.warning(f"Not enough timestamps to calculate MBT for {key}")
@@ -91,6 +93,10 @@ class VertexAIPrediction(beam.DoFn):
 
         # 1. Calculate MBT (Minutes Between Trains)
         data = []
+        # We need to align durations with timestamps. 
+        # Assuming durations[i] corresponds to timestamps[i]
+        # MBT at i is (timestamps[i] - timestamps[i-1])
+        
         for i in range(1, len(timestamps)):
             t_curr = timestamps[i]
             t_prev = timestamps[i-1]
@@ -98,9 +104,13 @@ class VertexAIPrediction(beam.DoFn):
             diff_seconds = t_curr - t_prev
             mbt = diff_seconds / 60.0
             
+            # Get duration for the current arrival if available
+            curr_duration = durations[i] if i < len(durations) else 0.0
+            
             data.append({
                 'ds': pd.to_datetime(t_curr, unit='s'),
                 'y': mbt,
+                'duration': curr_duration,
                 'unique_id': key.split('_')[0]
             })
             
@@ -116,19 +126,19 @@ class VertexAIPrediction(beam.DoFn):
         df['rolling_mean_50'] = df['y'].rolling(window=50, min_periods=1).mean()
         df['rolling_std_50'] = df['y'].rolling(window=50, min_periods=1).std().fillna(0)
         
-        # B. Cyclic Features (Calendar)
-        minutes_in_week = 7 * 24 * 60
-        minutes_in_day = 24 * 60
+        # B. Cyclic Features (Calendar) - Commented out as per user request
+        # minutes_in_week = 7 * 24 * 60
+        # minutes_in_day = 24 * 60
         
         # Ensure ds is datetime
         df['ds'] = pd.to_datetime(df['ds'])
         
-        df['week_sin'] = np.sin(2 * np.pi * df['ds'].dt.dayofweek * 24 * 60 / minutes_in_week)
-        df['week_cos'] = np.cos(2 * np.pi * df['ds'].dt.dayofweek * 24 * 60 / minutes_in_week)
+        # df['week_sin'] = np.sin(2 * np.pi * df['ds'].dt.dayofweek * 24 * 60 / minutes_in_week)
+        # df['week_cos'] = np.cos(2 * np.pi * df['ds'].dt.dayofweek * 24 * 60 / minutes_in_week)
         
-        current_minute = df['ds'].dt.hour * 60 + df['ds'].dt.minute
-        df['day_sin'] = np.sin(2 * np.pi * current_minute / minutes_in_day)
-        df['day_cos'] = np.cos(2 * np.pi * current_minute / minutes_in_day)
+        # current_minute = df['ds'].dt.hour * 60 + df['ds'].dt.minute
+        # df['day_sin'] = np.sin(2 * np.pi * current_minute / minutes_in_day)
+        # df['day_cos'] = np.cos(2 * np.pi * current_minute / minutes_in_day)
         
         # C. Weather Features (Exogenous)
         weather_cols = ['temp', 'precip', 'snow', 'snowdepth', 'visibility', 'windspeed']

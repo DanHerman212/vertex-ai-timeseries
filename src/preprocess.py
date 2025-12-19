@@ -106,9 +106,11 @@ def preprocess_data(input_path, output_path):
             print("Warning: weather_data.csv not found. Skipping weather integration.")
 
         # Rename for NeuralForecast compatibility (Universal standard here)
-        df = df.rename(columns={'arrival_date': 'ds', 'mbt': 'y'})
-    elif 'ds' in df.columns:
-        df['ds'] = pd.to_datetime(df['ds'])
+        # Target is MBT (y), Duration is a feature
+        if 'mbt' in df.columns:
+            df = df.rename(columns={'arrival_date': 'ds', 'mbt': 'y'})
+        elif 'ds' in df.columns:
+            df['ds'] = pd.to_datetime(df['ds'])
 
     # --- Feature Engineering (Universal) ---
     print("Generating features...")
@@ -122,18 +124,25 @@ def preprocess_data(input_path, output_path):
     df['rolling_mean_10'] = df['y'].rolling(window=10).mean().bfill()
     df['rolling_std_10'] = df['y'].rolling(window=10).std().bfill()
     df['rolling_mean_50'] = df['y'].rolling(window=50).mean().bfill()
+    
+    # Ensure 'duration' is present (fill with 0 or mean if missing, though it should be there)
+    if 'duration' not in df.columns:
+        print("Warning: 'duration' column missing. Filling with 0.")
+        df['duration'] = 0.0
+    else:
+        df['duration'] = df['duration'].fillna(0.0)
 
-    # 2. Cyclic Features
+    # 2. Cyclic Features (Commented out as per user request)
     # Weekly
-    minutes_in_week = 7 * 24 * 60
-    df['week_sin'] = np.sin(2 * np.pi * df['ds'].dt.dayofweek * 24 * 60 / minutes_in_week)
-    df['week_cos'] = np.cos(2 * np.pi * df['ds'].dt.dayofweek * 24 * 60 / minutes_in_week)
+    # minutes_in_week = 7 * 24 * 60
+    # df['week_sin'] = np.sin(2 * np.pi * df['ds'].dt.dayofweek * 24 * 60 / minutes_in_week)
+    # df['week_cos'] = np.cos(2 * np.pi * df['ds'].dt.dayofweek * 24 * 60 / minutes_in_week)
 
     # Daily
-    minutes_in_day = 24 * 60
-    current_minute = df['ds'].dt.hour * 60 + df['ds'].dt.minute
-    df['day_sin'] = np.sin(2 * np.pi * current_minute / minutes_in_day)
-    df['day_cos'] = np.cos(2 * np.pi * current_minute / minutes_in_day)
+    # minutes_in_day = 24 * 60
+    # current_minute = df['ds'].dt.hour * 60 + df['ds'].dt.minute
+    # df['day_sin'] = np.sin(2 * np.pi * current_minute / minutes_in_day)
+    # df['day_cos'] = np.cos(2 * np.pi * current_minute / minutes_in_day)
 
     # Fill NaNs
     df = df.bfill()
