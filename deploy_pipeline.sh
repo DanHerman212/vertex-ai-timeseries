@@ -174,7 +174,7 @@ echo "[2/3] Compiling Pipeline..."
 # Only install lightweight compilation dependencies, not the full training requirements
 echo "Installing KFP and Pipeline Components..."
 # Pinning google-cloud-pipeline-components to a version compatible with Python 3.12
-pip install -q "kfp>=2.7.0" "google-cloud-pipeline-components>=2.18.0" "google-cloud-aiplatform>=1.38.0" "google-auth>=2.22.0"
+pip install -q "kfp>=2.7.0" "google-cloud-pipeline-components>=2.18.0" "google-cloud-aiplatform>=1.38.0" "google-auth>=2.29.0" "requests>=2.31.0"
 
 # Export the image URI so pipeline.py can use it during compilation
 export TENSORFLOW_IMAGE_URI="$TENSORFLOW_IMAGE_URI"
