@@ -81,10 +81,10 @@ def train_and_save(model_dir, input_path, test_output_path=None, max_steps=1000)
     # Create Test DataFrame for export
     # IMPORTANT: We include the lookback window (input_size=160) so the model has context
     # for the first prediction in the test set.
-    # We also add a buffer (e.g. 20 steps) to allow for validation splits during evaluation
-    # (since evaluate_nhits.py uses val_size=10, we need at least input_size + val_size history)
+    # We also add a buffer (e.g. 50 steps) to allow for validation splits during evaluation
+    # (since evaluate_nhits.py uses val_size=0, we need at least input_size + horizon history)
     input_size = 160
-    buffer_size = 20
+    buffer_size = 50
     start_idx = max(0, train_size + val_size - input_size - buffer_size)
     test_df_export = Y_df.iloc[start_idx:]
     
