@@ -40,6 +40,10 @@ def run(argv=None):
     parser.add_argument(
         '--weather_api_key',
         help='Visual Crossing API Key for live weather data.')
+    parser.add_argument(
+        '--dry_run',
+        action='store_true',
+        help='If set, skips Vertex AI prediction and Firestore write.')
     
     known_args, pipeline_args = parser.parse_known_args(argv)
     pipeline_options = PipelineOptions(pipeline_args)
@@ -85,17 +89,24 @@ def run(argv=None):
                 region=known_args.region,
                 endpoint_id=known_args.endpoint_id,
                 weather_csv_path=known_args.weather_csv,
-                weather_api_key=known_args.weather_api_key
+                weather_api_key=known_args.weather_api_key,
+                dry_run=known_args.dry_run
             ))
         )
 
         # 6. Write to Firestore
-        (predictions
-            | "WriteToFirestore" >> beam.ParDo(WriteToFirestore(
-                project_id=known_args.project_id,
-                collection_name=known_args.output_collection
-            ))
-        )
+        if not known_args.dry_run:
+            (predictions
+                | "WriteToFirestore" >> beam.ParDo(WriteToFirestore(
+                    project_id=known_args.project_id,
+                    collection_name=known_args.output_collection
+                ))
+            )
+        else:
+            # In dry run, just log the predictions
+            (predictions
+                | "LogPredictions" >> beam.Map(lambda x: logging.info(f"Dry Run Prediction: {x}"))
+            )
 
 if __name__ == '__main__':
     logging.getLogger().setLevel(logging.INFO)

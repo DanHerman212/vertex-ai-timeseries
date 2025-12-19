@@ -13,12 +13,13 @@ class VertexAIPrediction(beam.DoFn):
     generates exogenous features (rolling stats, calendar, weather),
     and calls the Vertex AI Endpoint for a forecast.
     """
-    def __init__(self, project_id, region, endpoint_id, weather_csv_path=None, weather_api_key=None):
+    def __init__(self, project_id, region, endpoint_id, weather_csv_path=None, weather_api_key=None, dry_run=False):
         self.project_id = project_id
         self.region = region
         self.endpoint_id = endpoint_id
         self.weather_csv_path = weather_csv_path
         self.weather_api_key = weather_api_key
+        self.dry_run = dry_run
         self.client = None
         self.weather_df = None
         self.weather_fetcher = None
@@ -28,8 +29,9 @@ class VertexAIPrediction(beam.DoFn):
         """
         Initialize the Vertex AI client and load weather data once per worker.
         """
-        aiplatform.init(project=self.project_id, location=self.region)
-        self.endpoint = aiplatform.Endpoint(self.endpoint_id)
+        if not self.dry_run:
+            aiplatform.init(project=self.project_id, location=self.region)
+            self.endpoint = aiplatform.Endpoint(self.endpoint_id)
         
         # Initialize Weather Fetcher if API key is present
         if self.weather_api_key:
