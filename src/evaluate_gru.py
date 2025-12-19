@@ -114,70 +114,85 @@ def plot_loss(model_dir, output_path):
     
     print(f"Loss plot saved to {output_path}")
 
-def plot_residuals_distribution(actuals, predictions, output_path):
-    # Ensure 1D arrays for KDE
+def plot_evaluation_report(actuals, predictions, output_path):
+    # Ensure 1D arrays
     actuals = actuals.flatten()
     predictions = predictions.flatten()
 
-    plt.figure(figsize=(16, 6))
+    # Create figure with GridSpec layout
+    # Top: Time Series (Full Width)
+    # Bottom: Density (Left), Residuals (Right)
+    fig = plt.figure(figsize=(16, 12))
+    gs = fig.add_gridspec(2, 2)
+    
+    # --- Plot 1: Time Series (First 500 samples) ---
+    ax1 = fig.add_subplot(gs[0, :])
+    limit = 500
+    ax1.plot(actuals[:limit], label='Actual', color='black', linewidth=1.5, alpha=1.0)
+    ax1.plot(predictions[:limit], label='Predicted', color='blue', linewidth=1.5, alpha=0.7)
+    ax1.set_title(f'Time Series Prediction (First {limit} samples)')
+    ax1.set_xlabel('Sample Index')
+    ax1.set_ylabel('Value')
+    ax1.legend()
+    ax1.grid(True, alpha=0.3)
 
-    # Plot 1: Distribution of Actual vs Predicted
-    plt.subplot(1, 2, 1)
+    # --- Plot 2: Distribution of Actual vs Predicted ---
+    ax2 = fig.add_subplot(gs[1, 0])
     
     # Kernel Density Estimation
-    density_actual = gaussian_kde(actuals)
-    density_pred = gaussian_kde(predictions)
+    try:
+        density_actual = gaussian_kde(actuals)
+        density_pred = gaussian_kde(predictions)
+        
+        min_val = min(actuals.min(), predictions.min())
+        max_val = max(actuals.max(), predictions.max())
+        padding = (max_val - min_val) * 0.1
+        xs = np.linspace(min_val - padding, max_val + padding, 200)
+        
+        ax2.plot(xs, density_actual(xs), color='green', label='Actual')
+        ax2.fill_between(xs, density_actual(xs), color='green', alpha=0.3)
+        
+        ax2.plot(xs, density_pred(xs), color='orange', label='Predicted')
+        ax2.fill_between(xs, density_pred(xs), color='orange', alpha=0.3)
+    except Exception as e:
+        print(f"Could not plot KDE: {e}")
+        ax2.hist(actuals, bins=30, density=True, alpha=0.5, color='green', label='Actual')
+        ax2.hist(predictions, bins=30, density=True, alpha=0.5, color='orange', label='Predicted')
     
-    # Determine range for evaluation
-    min_val = min(actuals.min(), predictions.min())
-    max_val = max(actuals.max(), predictions.max())
-    padding = (max_val - min_val) * 0.1
-    xs = np.linspace(min_val - padding, max_val + padding, 200)
-    
-    plt.plot(xs, density_actual(xs), color='green', label='Actual')
-    plt.fill_between(xs, density_actual(xs), color='green', alpha=0.3)
-    
-    plt.plot(xs, density_pred(xs), color='orange', label='Predicted')
-    plt.fill_between(xs, density_pred(xs), color='orange', alpha=0.3)
-    
-    plt.title('Distribution of Actual vs Predicted Values')
-    plt.xlabel('Value')
-    plt.ylabel('Density')
-    plt.legend()
-    plt.grid(True, alpha=0.3)
+    ax2.set_title('Distribution of Actual vs Predicted Values')
+    ax2.set_xlabel('Value')
+    ax2.set_ylabel('Density')
+    ax2.legend()
+    ax2.grid(True, alpha=0.3)
 
-    # Plot 2: Residuals
-    residuals = actuals - predictions.flatten() # Ensure 1D
-    plt.subplot(1, 2, 2)
+    # --- Plot 3: Residuals ---
+    ax3 = fig.add_subplot(gs[1, 1])
+    residuals = actuals - predictions
     
     # Histogram
-    # Use density=False to get counts, but we need to scale KDE to match
-    counts, bins, patches = plt.hist(residuals, bins=30, density=False, color='purple', alpha=0.6, edgecolor='black')
+    counts, bins, patches = ax3.hist(residuals, bins=30, density=False, color='purple', alpha=0.6, edgecolor='black')
     
     # KDE for residuals
-    density_res = gaussian_kde(residuals)
+    try:
+        density_res = gaussian_kde(residuals)
+        min_res = residuals.min()
+        max_res = residuals.max()
+        padding_res = (max_res - min_res) * 0.1
+        xs_res = np.linspace(min_res - padding_res, max_res + padding_res, 200)
+        
+        curve = density_res(xs_res)
+        bin_width = bins[1] - bins[0]
+        scale_factor = len(residuals) * bin_width
+        
+        ax3.plot(xs_res, curve * scale_factor, color='purple', linewidth=2)
+    except:
+        pass
     
-    min_res = residuals.min()
-    max_res = residuals.max()
-    padding_res = (max_res - min_res) * 0.1
-    xs_res = np.linspace(min_res - padding_res, max_res + padding_res, 200)
-    
-    curve = density_res(xs_res)
-    # Scale curve to match histogram counts
-    # Area of histogram = sum(counts) * bin_width
-    # Area of PDF = 1
-    # So scale factor = len(residuals) * bin_width
-    bin_width = bins[1] - bins[0]
-    scale_factor = len(residuals) * bin_width
-    
-    plt.plot(xs_res, curve * scale_factor, color='purple', linewidth=2)
-    
-    plt.axvline(x=0, color='black', linestyle='--', linewidth=2)
-    
-    plt.title('Distribution of Prediction Errors (Residuals)')
-    plt.xlabel('Error (Actual - Predicted)')
-    plt.ylabel('Count')
-    plt.grid(True, alpha=0.3)
+    ax3.axvline(x=0, color='black', linestyle='--', linewidth=2)
+    ax3.set_title('Distribution of Prediction Errors (Residuals)')
+    ax3.set_xlabel('Error (Actual - Predicted)')
+    ax3.set_ylabel('Count')
+    ax3.grid(True, alpha=0.3)
     
     plt.tight_layout()
     
@@ -192,11 +207,11 @@ def plot_residuals_distribution(actuals, predictions, output_path):
     html_content = f"""
     <html>
     <head>
-        <title>Residuals and Distribution</title>
+        <title>Model Evaluation Report</title>
     </head>
     <body>
-        <h1>Model Evaluation Plots</h1>
-        <img src="data:image/png;base64,{img_base64}" alt="Residuals and Distribution Plot">
+        <h1>Model Evaluation Report</h1>
+        <img src="data:image/png;base64,{img_base64}" alt="Evaluation Plots">
     </body>
     </html>
     """
@@ -205,7 +220,7 @@ def plot_residuals_distribution(actuals, predictions, output_path):
     with open(output_path, 'w') as f:
         f.write(html_content)
     
-    print(f"Residuals and distribution plot saved to {output_path}")
+    print(f"Evaluation report saved to {output_path}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -227,9 +242,9 @@ if __name__ == "__main__":
     if args.plot_output_path:
         plot_loss(args.model_dir, args.plot_output_path)
         
-    # 4. Plot Residuals and Distribution
+    # 4. Plot Evaluation Report (Time Series + Residuals)
     if args.prediction_plot_path:
-        plot_residuals_distribution(actuals, predictions, args.prediction_plot_path)
+        plot_evaluation_report(actuals, predictions, args.prediction_plot_path)
     
     # 5. Save Metrics for Vertex AI
     metrics = {

@@ -6,6 +6,7 @@ import json
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from scipy.stats import gaussian_kde
 from neuralforecast import NeuralForecast
 # from neuralforecast.losses.numpy import mae, rmse # Replaced by utilsforecast
 from utilsforecast.evaluation import evaluate
@@ -282,7 +283,8 @@ def plot_predictions(forecasts_df, output_path):
     limit = 500
     plot_df = forecasts_df.iloc[:limit]
     
-    plt.plot(plot_df['ds'], plot_df['y'], label='Actual', color='black', alpha=0.7)
+    # Plot Actuals (Black, solid)
+    plt.plot(plot_df['ds'], plot_df['y'], label='Actual', color='black', linewidth=1.5, alpha=1.0)
     
     # Check for median or default
     y_pred_col = 'NHITS-median' if 'NHITS-median' in plot_df.columns else 'NHITS'
@@ -295,7 +297,8 @@ def plot_predictions(forecasts_df, output_path):
          if candidates:
              y_pred_col = candidates[0]
     
-    plt.plot(plot_df['ds'], plot_df[y_pred_col], label='Predicted', color='blue', linewidth=2)
+    # Plot Predicted (Blue, slightly transparent to show overlaps)
+    plt.plot(plot_df['ds'], plot_df[y_pred_col], label='Predicted', color='blue', linewidth=1.5, alpha=0.7)
     
     # Plot Confidence Intervals if available
     # Note: We renamed columns for utilsforecast earlier, but forecasts_df might still have original names
