@@ -32,12 +32,27 @@ def load_data(input_path):
         
     # Ensure datetime
     df['ds'] = pd.to_datetime(df['ds'])
-    # Remove timezone if present to avoid merge issues with NeuralForecast generated dates
+    # Remove timezone if present
     if df['ds'].dt.tz is not None:
         df['ds'] = df['ds'].dt.tz_localize(None)
+        
+    # Round to hourly frequency to ensure alignment with NeuralForecast's freq='H'
+    # This fixes potential mismatches during cross_validation merge
+    df['ds'] = df['ds'].dt.floor('H')
     
     # Add unique_id
     df['unique_id'] = 'E'
+    
+    # Aggregate duplicates if any exist after rounding (taking the mean)
+    # This ensures strictly one record per hour per unique_id
+    if df.duplicated(subset=['unique_id', 'ds']).any():
+        print("Aggregating duplicate timestamps after hourly rounding...")
+        # Identify numeric columns for aggregation
+        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        # Ensure 'ds' and 'unique_id' are not in numeric_cols to avoid errors, though groupby handles them
+        numeric_cols = [c for c in numeric_cols if c not in ['ds', 'unique_id']]
+        
+        df = df.groupby(['unique_id', 'ds'])[numeric_cols].mean().reset_index()
     
     print(f"Data shape after processing: {df.shape}")
     return df
@@ -199,7 +214,13 @@ def train_and_save(model_dir, input_path, test_output_path=None, max_steps=1000,
     ## 9. Visualizing Predictions vs Actuals
 
     # Plot a segment of the forecasts
-    plot_df = forecasts.iloc[:200] # First 200 predictions
+    plot_df = forecasts.iloc[:200].copy() # First 200 predictions
+    
+    # Debug: Check if actuals are present
+    if plot_df['y'].isnull().all():
+        print("WARNING: 'y' (Actuals) column in plot dataframe is entirely NaN. Check timestamp alignment.")
+    else:
+        print(f"Plotting {plot_df['y'].count()} actual values against predictions.")
 
     plt.figure(figsize=(15, 5))
     plt.plot(plot_df['ds'], plot_df['y'], label='Actual MBT', color='black', alpha=0.7)
