@@ -1,0 +1,30 @@
+# Version Control
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env
+
+# Jupyter Notebooks and Data
+.ipynb_checkpoints
+training_and_preprocessing_workflows/
+weather_data.csv
+
+# Logs and Test Data
+lightning_logs/
+local_test_data/
+.vertex_ai/
+
+# Documentation
+docs/
+images/
+
+# System
+.DS_Store
