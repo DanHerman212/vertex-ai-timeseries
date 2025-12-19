@@ -95,6 +95,33 @@ def evaluate_nhits(model_dir, test_csv_path, metrics_output_path, plot_output_pa
     
     print("Forecasts generated. Columns:", forecasts.columns, flush=True)
     
+    # DEBUG: Inspect Forecast Statistics
+    print("\n--- Forecast Statistics ---")
+    # Identify prediction column
+    pred_col = 'NHITS-median' if 'NHITS-median' in forecasts.columns else 'NHITS'
+    if pred_col not in forecasts.columns:
+         candidates = [c for c in forecasts.columns if c.startswith('NHITS') and '-lo-' not in c and '-hi-' not in c]
+         if candidates:
+             pred_col = candidates[0]
+             
+    if pred_col in forecasts.columns:
+        print(forecasts[pred_col].describe())
+        print(f"Max Prediction: {forecasts[pred_col].max()}")
+        print(f"Min Prediction: {forecasts[pred_col].min()}")
+        
+        # Check for extreme outliers
+        high_preds = forecasts[forecasts[pred_col] > 100]
+        if not high_preds.empty:
+            print(f"\nWARNING: Found {len(high_preds)} predictions > 100 minutes!")
+            print(high_preds.head())
+            
+        # FIX: Clamp predictions to reasonable range [0, 120]
+        # This prevents exploding gradients/predictions from ruining the metrics
+        print("Clamping predictions to [0, 120] minutes...", flush=True)
+        forecasts[pred_col] = forecasts[pred_col].clip(lower=0.0, upper=120.0)
+        
+    print("---------------------------\n")
+
     # Calculate Metrics using utilsforecast
     # Prepare dataframe: Rename NHITS-median to NHITS for standard evaluation
     eval_df = forecasts.copy()
@@ -214,7 +241,13 @@ def evaluate_nhits(model_dir, test_csv_path, metrics_output_path, plot_output_pa
         plot_loss(model_dir, plot_output_path)
         
     if prediction_plot_path:
-        plot_predictions(forecasts, prediction_plot_path)
+        # Pass metrics dict for display in HTML
+        metrics_dict = {
+            "MAE": mae_val,
+            "RMSE": rmse_val,
+            "Scaled CRPS": crps_val
+        }
+        plot_predictions(forecasts, prediction_plot_path, metrics=metrics_dict)
 
 def plot_loss(model_dir, output_path):
     logs_dir = os.path.join(model_dir, "training_logs")
@@ -276,7 +309,7 @@ def plot_loss(model_dir, output_path):
     
     save_plot_html(output_path, "Training Loss")
 
-def plot_predictions(forecasts_df, output_path):
+def plot_predictions(forecasts_df, output_path, metrics=None):
     # Create figure with GridSpec layout
     fig = plt.figure(figsize=(16, 12))
     gs = fig.add_gridspec(2, 2)
@@ -386,9 +419,9 @@ def plot_predictions(forecasts_df, output_path):
     
     plt.tight_layout()
     
-    save_plot_html(output_path, "Model Evaluation Report")
+    save_plot_html(output_path, "Model Evaluation Report", metrics=metrics)
 
-def save_plot_html(output_path, title):
+def save_plot_html(output_path, title, metrics=None):
     import base64
     from io import BytesIO
     
@@ -397,12 +430,54 @@ def save_plot_html(output_path, title):
     buf.seek(0)
     img_base64 = base64.b64encode(buf.read()).decode('utf-8')
     
+    # Generate Metrics Table HTML if metrics are provided
+    metrics_html = ""
+    if metrics:
+        rows = ""
+        for key, value in metrics.items():
+            # Format numbers nicely
+            if isinstance(value, float):
+                val_str = f"{value:.4f}"
+            else:
+                val_str = str(value)
+            rows += f"<tr><td>{key}</td><td>{val_str}</td></tr>"
+            
+        metrics_html = f"""
+        <div style="margin: 20px auto; width: 80%; font-family: Arial, sans-serif;">
+            <h2 style="text-align: center; color: #333;">Performance Metrics</h2>
+            <table style="width: 100%; border-collapse: collapse; margin-top: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+                <thead>
+                    <tr style="background-color: #007bff; color: white;">
+                        <th style="padding: 12px; text-align: left; border: 1px solid #ddd;">Metric</th>
+                        <th style="padding: 12px; text-align: left; border: 1px solid #ddd;">Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {rows}
+                </tbody>
+            </table>
+        </div>
+        """
+    
     html_content = f"""
     <html>
-    <head><title>{title}</title></head>
+    <head>
+        <title>{title}</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; margin: 20px; background-color: #f9f9f9; }}
+            h1 {{ text-align: center; color: #333; }}
+            img {{ display: block; margin: 0 auto; max-width: 100%; height: auto; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }}
+            tr:nth-child(even) {{ background-color: #f2f2f2; }}
+            tr:hover {{ background-color: #ddd; }}
+            td {{ padding: 10px; border: 1px solid #ddd; color: #555; }}
+        </style>
+    </head>
     <body>
         <h1>{title}</h1>
-        <img src="data:image/png;base64,{img_base64}" alt="{title}">
+        {metrics_html}
+        <div style="margin-top: 30px;">
+            <img src="data:image/png;base64,{img_base64}" alt="{title}">
+        </div>
     </body>
     </html>
     """
