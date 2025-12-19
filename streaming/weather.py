@@ -19,9 +19,16 @@ class WeatherFetcher:
         if not self.api_key:
             return None
 
-        # Fetch for 'today' and 'tomorrow' to ensure coverage
-        # Visual Crossing allows date ranges.
-        url = f"{self.base_url}/{self.location}/next24hours?unitGroup=us&key={self.api_key}&include=hours&contentType=json"
+        # Guidance URL format
+        # https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/{zipcode}/today
+        # Parameters: unitGroup=us, key=..., contentType=json, include=hours, elements=...
+        
+        base_url = "https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline"
+        elements = "datetime,temp,precip,snow,snowdepth,visibility,windspeed"
+        
+        # Use 'next24hours' for streaming to ensure we have future coverage for predictions
+        # But stick to the guidance parameters for efficiency
+        url = f"{base_url}/{self.location}/next24hours?unitGroup=us&key={self.api_key}&contentType=json&include=hours&elements={elements}"
         
         try:
             response = requests.get(url)

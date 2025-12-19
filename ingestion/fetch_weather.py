@@ -18,8 +18,16 @@ class WeatherFetcher:
             logging.error("Visual Crossing API Key is missing.")
             return None
 
-        # Fetch for 'today' to get current and hourly data
-        url = f"{self.base_url}/{self.location}/today?unitGroup=us&key={self.api_key}&include=current,hours&contentType=json"
+        # Guidance URL format
+        # https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/{zipcode}/today
+        # Parameters: unitGroup=us, key=..., contentType=json, include=hours, elements=...
+        
+        base_url = "https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline"
+        elements = "datetime,temp,precip,snow,snowdepth,visibility,windspeed"
+        
+        url = f"{base_url}/{self.location}/today?unitGroup=us&key={self.api_key}&contentType=json&include=hours&elements={elements}"
+        
+        print(f"Testing URL: {url}")
         
         try:
             response = requests.get(url)
@@ -27,6 +35,8 @@ class WeatherFetcher:
             return response.json()
         except requests.exceptions.RequestException as e:
             logging.error(f"Error fetching weather data: {e}")
+            if response.status_code == 400:
+                 logging.error(f"Response: {response.text}")
             return None
 
     def parse_weather_data(self, data):
