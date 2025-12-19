@@ -1,31 +1,39 @@
-# Version Control
-.git
-.gitignore
+# Ignore everything by default
+*
 
-# Python
-__pycache__
-*.pyc
-*.pyo
-*.pyd
-.Python
-env/
-venv/
-.env
+# Explicitly allow directories
+!docker/
+!ingestion/
+!src/
+!streaming/
+!tests/
+!training_and_preprocessing_workflows/
 
-# Jupyter Notebooks and Data
-.ipynb_checkpoints
-training_and_preprocessing_workflows/
+# Explicitly allow root files
+!*.py
+!*.sh
+!*.txt
+!*.md
+!Dockerfile*
+!.gcloudignore
 
-# Logs and Test Data
+# Re-ignore specific patterns that might be inside allowed directories
+# Data files
+*.csv
+*.json
+*.parquet
+*.pkl
+
+# Logs and Temporary files
 lightning_logs/
-local_test_data/
-.vertex_ai
-.vertex_ai/
-.vertex_ai/**
-
-# Documentation
-docs/
-images/
-
-# System
+__pycache__/
+*.pyc
 .DS_Store
+.ipynb_checkpoints/
+
+# Virtual Environments
+venv/
+env/
+
+# Git
+.git/

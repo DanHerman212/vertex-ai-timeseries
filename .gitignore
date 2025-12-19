@@ -148,3 +148,12 @@ pipeline_root/
 # Google Cloud Credentials
 storage_key.json
 **/storage_key.json
+
+# Project Specific Data & Logs
+lightning_logs/
+*.csv
+*.pkl
+*.tar.gz
+workspace.tar.gz
+streaming/json_files/
+.ipynb_checkpoints/
