@@ -74,6 +74,7 @@ class VertexAIPrediction(beam.DoFn):
             try:
                 # Round to nearest hour for lookup
                 ts_hour = timestamp.round('h')
+                
                 # Ensure naive datetime if index is naive
                 if self.weather_df.index.tz is None and ts_hour.tz is not None:
                     ts_hour = ts_hour.tz_localize(None)

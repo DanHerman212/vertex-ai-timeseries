@@ -57,12 +57,26 @@ class WeatherFetcher:
                 date_str = day['datetime']
                 for hour in day.get('hours', []):
                     time_str = hour['datetime']
-                    # Visual Crossing returns HH:MM:SS
+                    # Visual Crossing returns HH:MM:SS in Local Time (NYC)
                     dt_str = f"{date_str} {time_str}"
                     try:
-                        dt = pd.to_datetime(dt_str)
-                        # Round to nearest hour just in case
-                        dt_hour = dt.round('h')
+                        # 1. Parse as naive datetime (representing NYC time)
+                        dt_nyc = pd.to_datetime(dt_str)
+                        
+                        # 2. Localize to NYC
+                        dt_nyc = dt_nyc.tz_localize('America/New_York')
+                        
+                        # 3. Convert to UTC
+                        dt_utc = dt_nyc.tz_convert('UTC')
+                        
+                        # 4. Round to nearest hour (in UTC)
+                        dt_hour = dt_utc.round('h')
+                        
+                        # 5. Store as naive UTC (to match typical pandas behavior if needed, or keep aware)
+                        # Let's keep it timezone-aware UTC to be safe, or naive UTC if prediction expects it.
+                        # Prediction uses pd.to_datetime(unit='s') which is naive UTC usually unless localized.
+                        # Let's make it naive UTC to avoid mismatch issues with the prediction logic which strips tz.
+                        dt_hour_naive = dt_hour.tz_localize(None)
                         
                         features = {
                             'temp': hour.get('temp'),
@@ -78,7 +92,7 @@ class WeatherFetcher:
                             if v is None:
                                 features[k] = 0.0
                                 
-                        self.cache[dt_hour] = features
+                        self.cache[dt_hour_naive] = features
                     except Exception as e:
                         logging.warning(f"Error parsing weather hour: {e}")
 
