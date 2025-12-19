@@ -61,9 +61,7 @@ def train_and_save(model_dir, input_path, test_output_path=None):
     input_size = 150
     buffer_size = 20
     start_idx = max(0, train_size + val_size - input_size - buffer_size)
-    print(f"DEBUG: input_size={input_size}, buffer_size={buffer_size}, start_idx={start_idx}")
     test_df_export = Y_df.iloc[start_idx:]
-    print(f"DEBUG: test_df_export length={len(test_df_export)}")
     
     if test_output_path:
         print(f"Saving test dataframe to {test_output_path}...")
