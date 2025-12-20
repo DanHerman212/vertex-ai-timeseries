@@ -188,6 +188,10 @@ echo ""
 echo "[2/3] Compiling Pipeline..."
 # Only install lightweight compilation dependencies, not the full training requirements
 echo "Installing KFP and Pipeline Components..."
+
+# Add user local bin to PATH to ensure installed scripts are found
+export PATH="$HOME/.local/bin:$PATH"
+
 # Pinning google-cloud-pipeline-components to a version compatible with Python 3.12
 # Using --break-system-packages to bypass PEP 668 restrictions in this environment
 pip install -q --break-system-packages "kfp>=2.7.0" "google-cloud-pipeline-components>=2.18.0" "google-cloud-aiplatform>=1.38.0" "google-auth>=2.29.0" "requests>=2.31.0"
