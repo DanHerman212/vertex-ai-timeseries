@@ -8,6 +8,7 @@ from io import BytesIO
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from matplotlib.dates import DateFormatter
 from neuralforecast import NeuralForecast
 from utilsforecast.losses import mae, rmse
 from utilsforecast.evaluation import evaluate
@@ -55,6 +56,11 @@ def plot_cv_results(cv_df):
     ax.set_title('NHITS Forecast vs Actuals (Cross Validation)')
     ax.set_xlabel('Time')
     ax.set_ylabel('Minutes Between Trains (MBT)')
+    
+    # Format x-axis
+    date_form = DateFormatter("%Y-%m-%d %H:%M")
+    ax.xaxis.set_major_formatter(date_form)
+    
     ax.legend()
     ax.grid(True, alpha=0.3)
 

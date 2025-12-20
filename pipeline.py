@@ -74,6 +74,7 @@ def train_gru_component(
 def evaluate_gru_component(
     test_dataset: dsl.Input[dsl.Dataset],
     model_dir: dsl.Input[artifact_types.UnmanagedContainerModel],
+    input_csv: dsl.Input[dsl.Dataset],
     metrics: dsl.Output[dsl.Metrics],
     loss_plot: dsl.Output[dsl.HTML],
     prediction_plot: dsl.Output[dsl.HTML],
@@ -84,6 +85,7 @@ def evaluate_gru_component(
         args=[
             "--test_dataset_path", test_dataset.path,
             "--model_dir", model_dir.path,
+            "--input_csv", input_csv.path,
             "--metrics_output_path", metrics.path,
             "--plot_output_path", loss_plot.path,
             "--prediction_plot_path", prediction_plot.path
@@ -235,7 +237,8 @@ def forecasting_pipeline(
     # Step 5: Evaluate GRU
     evaluate_gru_task = evaluate_gru_component(
         test_dataset=train_gru_task.outputs["test_dataset"],
-        model_dir=train_gru_task.outputs["model_dir"]
+        model_dir=train_gru_task.outputs["model_dir"],
+        input_csv=preprocess_task.outputs["output_csv"]
     )
     # Assign GPU to evaluation task to support CudnnRNNV3 ops
     evaluate_gru_task.set_cpu_limit('4')
