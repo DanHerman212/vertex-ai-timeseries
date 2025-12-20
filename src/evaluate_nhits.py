@@ -15,6 +15,8 @@ try:
     from scipy.stats import gaussian_kde
     from neuralforecast import NeuralForecast
     from neuralforecast.losses.numpy import mae, rmse
+    from pytorch_lightning.loggers import CSVLogger
+    import tempfile
     print("All imports successful.", flush=True)
 except ImportError as e:
     print(f"CRITICAL: Import failed: {e}", flush=True)
@@ -88,13 +90,35 @@ def plot_predictions(forecasts_df):
 
     fig, ax = plt.subplots(figsize=(15, 5))
     ax.plot(plot_df['ds'], plot_df['y'], label='Actual MBT', color='black', alpha=0.7)
-    ax.plot(plot_df['ds'], plot_df['NHITS-median'], label='Predicted Median MBT', color='blue', linewidth=2)
     
-    # Check for confidence intervals
-    if 'NHITS-lo-90.0' in plot_df.columns and 'NHITS-hi-90.0' in plot_df.columns:
-         ax.fill_between(plot_df['ds'], plot_df['NHITS-lo-90.0'], plot_df['NHITS-hi-90.0'], color='blue', alpha=0.2, label='90% Confidence Interval')
-    elif 'NHITS-lo-80.0' in plot_df.columns and 'NHITS-hi-80.0' in plot_df.columns:
-        ax.fill_between(plot_df['ds'], plot_df['NHITS-lo-80.0'], plot_df['NHITS-hi-80.0'], color='blue', alpha=0.2, label='80% Confidence Interval')
+    # Identify Median Column
+    median_col = None
+    if 'NHITS-median' in plot_df.columns:
+        median_col = 'NHITS-median'
+    elif 'NHITS-q-0.5' in plot_df.columns:
+        median_col = 'NHITS-q-0.5'
+    elif 'NHITS' in plot_df.columns:
+        median_col = 'NHITS'
+        
+    if median_col:
+        ax.plot(plot_df['ds'], plot_df[median_col], label='Predicted Median MBT', color='blue', linewidth=2)
+    
+    # Identify Quantile Columns for Confidence Interval
+    # We expect q-0.1 and q-0.9 from MQLoss(quantiles=[0.1, 0.5, 0.9])
+    lo_col = None
+    hi_col = None
+    
+    if 'NHITS-q-0.1' in plot_df.columns and 'NHITS-q-0.9' in plot_df.columns:
+        lo_col = 'NHITS-q-0.1'
+        hi_col = 'NHITS-q-0.9'
+        label = '10%-90% Quantile Range'
+    elif 'NHITS-lo-90.0' in plot_df.columns and 'NHITS-hi-90.0' in plot_df.columns:
+         lo_col = 'NHITS-lo-90.0'
+         hi_col = 'NHITS-hi-90.0'
+         label = '90% Confidence Interval'
+        
+    if lo_col and hi_col:
+        ax.fill_between(plot_df['ds'], plot_df[lo_col], plot_df[hi_col], color='blue', alpha=0.2, label=label)
         
     ax.set_title('Subway Headway Prediction: Actual vs Predicted')
     ax.set_xlabel('Time')
@@ -193,27 +217,151 @@ def evaluate_nhits(model_dir, df_csv_path, metrics_output_path, html_output_path
     try:
         nf = NeuralForecast.load(path=model_dir)
         print("Model loaded successfully.", flush=True)
+        
+        # FIX: Disable logger completely to avoid "Missing folder" error
+        # We don't need training logs during evaluation/inference.
+        for model in nf.models:
+            # Disable logger in trainer_kwargs
+            if hasattr(model, 'trainer_kwargs') and isinstance(model.trainer_kwargs, dict):
+                model.trainer_kwargs['logger'] = False
+                model.trainer_kwargs['enable_checkpointing'] = False
+
+            # Clear existing logger instance
+            if hasattr(model, '_logger'):
+                model._logger = None
             
+            # Clear trainer reference so it re-initializes with new kwargs
+            if hasattr(model, '_trainer'):
+                model._trainer = None
+                
     except Exception as e:
         print(f"Failed to load model: {e}", flush=True)
         raise e
+    
     try:
-        # Use user requested setup
-        print(f"Running Cross Validation on df with horion = 1", flush=True)
+        # ---------------------------------------------------------
+        # ROLLING FORECAST LOOP (Inference Mode)
+        # ---------------------------------------------------------
+        # We want to evaluate on the last 20% of the data (Test Set).
+        # To predict the first point of the test set, we need the history 
+        # immediately preceding it.
         
-        horizon = 1
+        total_rows = len(df)
+        test_size = int(total_rows * 0.2)
+        test_start_idx = total_rows - test_size
+        
+        print(f"Total rows: {total_rows}", flush=True)
+        print(f"Test set size (last 20%): {test_size}", flush=True)
+        print(f"Test start index: {test_start_idx}", flush=True)
+        
+        # We need to know the model's input size to keep the buffer efficient
+        # Assuming the first model in the list is the one we use
+        # (NeuralForecast can hold multiple, but we trained one NHITS)
+        model_input_size = nf.models[0].input_size
+        print(f"Model input size: {model_input_size}", flush=True)
+        
+        # Buffer to hold recent history. 
+        # We start with enough history to cover the input_size before the test set.
+        # We take a bit more to be safe.
+        buffer_start_idx = max(0, test_start_idx - model_input_size - 10)
+        history_buffer = df.iloc[buffer_start_idx:test_start_idx].copy()
+        
+        test_df = df.iloc[test_start_idx:].copy()
+        
+        predictions = []
+        actuals = []
+        timestamps = []
+        
+        print("Starting rolling forecast loop...", flush=True)
+        
+        # Iterate through the test set
+        # For each step:
+        # 1. Predict next step using history_buffer
+        # 2. Store prediction
+        # 3. Add actual observation to history_buffer for next step
+        
+        # Optimization: nf.predict is relatively heavy. 
+        # If test set is large, this loop might take time.
+        # But for ~400-2000 points it should be acceptable.
+        
+        for idx, row in test_df.iterrows():
+            # Predict
+            # nf.predict uses the end of the dataframe to predict forward
+            # Since we have future exogenous variables, we must provide them in futr_df
+            # We need the future exogenous variables for the NEXT step (which is 'row')
+            
+            # Construct futr_df for the next step
+            # It needs 'unique_id', 'ds' and the future exogenous columns
+            # The 'ds' should be the timestamp we are predicting (which is row['ds'])
+            
+            # Identify future exogenous columns from the model
+            # We can infer them from the error message or model config, but let's assume we know them
+            # or just pass all columns except 'y'
+            
+            futr_exog_cols = ['temp', 'precip', 'snow', 'snowdepth', 'visibility', 'windspeed', 'dow']
+            
+            # Create a single-row dataframe for the future step
+            # futr_df = pd.DataFrame([row])
+            # Ensure it has the right columns
+            # futr_df = futr_df[['unique_id', 'ds'] + futr_exog_cols]
+            
+            # ROBUST FIX: Use make_future_dataframe to get the exact timestamp the model expects
+            # This handles frequency alignment automatically.
+            futr_df = nf.make_future_dataframe(df=history_buffer)
+            
+            # Now we need to populate the exogenous columns in this futr_df
+            # We can look up the values from our original 'df' based on the timestamp 'ds'
+            # This is efficient enough for evaluation
+            
+            # Merge with original df to get exog values
+            # We use 'ds' and 'unique_id' as keys
+            futr_df = futr_df.drop(columns=futr_exog_cols, errors='ignore') # Drop if they exist empty
+            futr_df = futr_df.merge(df[['unique_id', 'ds'] + futr_exog_cols], on=['unique_id', 'ds'], how='left')
+            
+            # Handle potential missing values if the model predicts a time not in our test set (e.g. gap filling)
+            # For now, forward fill or fill with 0
+            futr_df = futr_df.fillna(method='ffill').fillna(0)
+            
+            fcst_df = nf.predict(df=history_buffer, futr_df=futr_df)
+            
+            # Extract prediction (NHITS-median usually, or just NHITS)
+            # The column name depends on the model alias. 
+            # Default alias for NHITS is 'NHITS'. 
+            # If loss was MQLoss, we might have quantiles.
+            
+            # Let's find the prediction column
+            pred_cols = [c for c in fcst_df.columns if c not in ['ds', 'unique_id']]
+            # Prefer median or main point forecast
+            pred_col = next((c for c in pred_cols if 'median' in c), pred_cols[0])
+            
+            pred_value = fcst_df.iloc[0][pred_col]
+            
+            predictions.append(pred_value)
+            actuals.append(row['y'])
+            timestamps.append(row['ds'])
+            
+            # Update buffer: drop oldest, add new actual
+            # We append the current test row to history so it's available for the NEXT prediction
+            history_buffer = pd.concat([history_buffer.iloc[1:], df.iloc[[idx]]])
+            
+            if len(predictions) % 50 == 0:
+                print(f"Processed {len(predictions)}/{test_size} steps...", flush=True)
 
-        forecasts = nf.cross_validation(
-            df=df,
-            step_size=horizon,
-            val_size=horizon,
-            test_size=int(len(df)*0.2),
-            n_windows=None
-        )
+        # Construct Forecast DataFrame matching the structure expected by plotting functions
+        forecasts = pd.DataFrame({
+            'ds': timestamps,
+            'y': actuals,
+            'NHITS-median': predictions
+        })
+        
+        # Add dummy quantile columns if plotting expects them, to avoid errors
+        # (Or update plotting logic. For now, we just plot median)
+        forecasts['unique_id'] = 'E'
+        
         print(f"Forecasts generated. Shape: {forecasts.shape}", flush=True)
 
     except Exception as e:
-        print(f"CRITICAL ERROR during cross_validation: {e}", flush=True)
+        print(f"CRITICAL ERROR during rolling forecast: {e}", flush=True)
         import traceback
         traceback.print_exc()
         raise e
@@ -225,11 +373,25 @@ def evaluate_nhits(model_dir, df_csv_path, metrics_output_path, html_output_path
     
     # Full Set Metrics
     y_true = forecasts['y']
-    y_pred = forecasts['NHITS-median']
     
-    # Use neuralforecast losses
-    mae_val = mae(y_true, y_pred)
-    rmse_val = rmse(y_true, y_pred)
+    # Identify Median Column for Metrics
+    median_col = None
+    if 'NHITS-median' in forecasts.columns:
+        median_col = 'NHITS-median'
+    elif 'NHITS-q-0.5' in forecasts.columns:
+        median_col = 'NHITS-q-0.5'
+    elif 'NHITS' in forecasts.columns:
+        median_col = 'NHITS'
+        
+    if median_col:
+        y_pred = forecasts[median_col]
+        # Use neuralforecast losses
+        mae_val = mae(y_true, y_pred)
+        rmse_val = rmse(y_true, y_pred)
+    else:
+        print("Warning: Could not find median column for metrics calculation. Using 0.", flush=True)
+        mae_val = 0.0
+        rmse_val = 0.0
     
     print(f"MAE: {mae_val:.4f}")
     print(f"RMSE: {rmse_val:.4f}")

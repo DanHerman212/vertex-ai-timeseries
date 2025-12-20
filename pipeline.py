@@ -118,13 +118,28 @@ def evaluate_nhits_component(
 ):
     return dsl.ContainerSpec(
         image=PYTORCH_IMAGE_URI,
-        command=["python", "src/evaluate_nhits.py"],
+        command=["/bin/bash", "-c"],
         args=[
-            "--df_csv_path", df_csv.path,
-            "--model_dir", model_dir.path,
-            "--logs_dir", logs_dir.path,
-            "--metrics_output_path", metrics.path,
-            "--html_output_path", html_summary.path
+            """
+            echo "DEBUG: Starting evaluation component"
+            echo "DEBUG: Current directory: $(pwd)"
+            echo "DEBUG: Listing src directory:"
+            ls -R src/
+            echo "DEBUG: Python version:"
+            python --version
+            echo "DEBUG: Running script..."
+            python -u src/evaluate_nhits.py \
+            --df_csv_path "$0" \
+            --model_dir "$1" \
+            --logs_dir "$2" \
+            --metrics_output_path "$3" \
+            --html_output_path "$4"
+            """,
+            df_csv.path,
+            model_dir.path,
+            logs_dir.path,
+            metrics.path,
+            html_summary.path
         ]
     )
 
