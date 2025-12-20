@@ -8,9 +8,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
 from neuralforecast import NeuralForecast
-# from neuralforecast.losses.numpy import mae, rmse # Replaced by utilsforecast
-from utilsforecast.evaluation import evaluate
-from utilsforecast.losses import mae, rmse, scaled_crps
+from neuralforecast.losses.numpy import mae, rmse
 
 def evaluate_nhits(model_dir, test_csv_path, metrics_output_path, plot_output_path, prediction_plot_path):
     print(f"Starting evaluation script...", flush=True)
@@ -18,6 +16,7 @@ def evaluate_nhits(model_dir, test_csv_path, metrics_output_path, plot_output_pa
     test_df = pd.read_csv(test_csv_path)
     
     print(f"Test data columns: {test_df.columns.tolist()}", flush=True)
+    print(f"Test data shape: {test_df.shape}", flush=True)
     
     # Ensure datetime
     if 'ds' in test_df.columns:
@@ -77,134 +76,54 @@ def evaluate_nhits(model_dir, test_csv_path, metrics_output_path, plot_output_pa
     # We must ensure the remaining data (context) is large enough for the model to train (input_size + horizon).
     # We reserve input_size + 10 steps for context to avoid "No windows available" errors.
     
-    min_context = input_size + 10
-    n_test_steps = len(test_df) - min_context
-    print(f"Total rows in test_df: {len(test_df)}", flush=True)
-    print(f"Reserved Context: {min_context}", flush=True)
-    print(f"Expected test steps: {n_test_steps}", flush=True)
+    # min_context = input_size + 10
+    # n_test_steps = len(test_df) - min_context
+    # print(f"Total rows in test_df: {len(test_df)}", flush=True)
+    # print(f"Reserved Context: {min_context}", flush=True)
+    # print(f"Expected test steps: {n_test_steps}", flush=True)
     
-    if n_test_steps <= 0:
-        raise ValueError(f"Test dataframe is too small ({len(test_df)}) for input_size ({input_size}).")
+    # if n_test_steps <= 0:
+    #     raise ValueError(f"Test dataframe is too small ({len(test_df)}) for input_size ({input_size}).")
         
-    print(f"Forecasting using predict_insample...", flush=True)
+    print(f"Forecasting using cross_validation...", flush=True)
     
     try:
-        # Use predict_insample to generate 1-step ahead forecasts using actual history
-        # This avoids recursive forecasting (which accumulates error and is slow/memory-intensive for large horizons)
-        # and correctly evaluates the model's ability to predict the next step given ground truth.
-        forecasts = nf.predict_insample(df=test_df)
+        # Use user requested setup
+        #subset_test_size = 1000 # Evaluate on first 1000 points of test set
+        print(f"Running Cross Validation on subset ({len(test_df)} samples)...", flush=True)
         
-        # Filter to keep only the 'test' portion (excluding the context buffer)
-        # The original script calculated n_test_steps based on a reserved context.
-        # We'll keep the last n_test_steps to be consistent.
-        if len(forecasts) > n_test_steps:
-             forecasts = forecasts.iloc[-n_test_steps:]
-        
+        forecasts = nf.cross_validation(
+            df=test_df,
+            val_size=len(test_df),
+            test_size=len(test_df),
+            n_windows=None,
+            step_size=1
+        )
         print(f"Forecasts generated. Shape: {forecasts.shape}", flush=True)
-        print("Forecast columns:", forecasts.columns.tolist(), flush=True)
-        
-        # predict_insample returns 'y' (actuals) if present in input, so no need to merge
-        # But we ensure 'y' is present just in case
-        if 'y' not in forecasts.columns:
-             # Merge actuals if missing (unlikely)
-             forecasts = forecasts.merge(test_df[['unique_id', 'ds', 'y']], on=['unique_id', 'ds'], how='left')
-            
+
     except Exception as e:
-        print(f"CRITICAL ERROR during predict_insample: {e}", flush=True)
-        # Try to print more context
+        print(f"CRITICAL ERROR during cross_validation: {e}", flush=True)
         import traceback
         traceback.print_exc()
         raise e
     
     print("Forecasts generated. Columns:", forecasts.columns, flush=True)
     
-    # Calculate Metrics using utilsforecast
-    # Prepare dataframe: Rename NHITS-median to NHITS for standard evaluation
-    eval_df = forecasts.copy()
-    if 'NHITS-median' in eval_df.columns:
-        eval_df = eval_df.rename(columns={'NHITS-median': 'NHITS'})
-        
-    # Drop cutoff column if present, otherwise utilsforecast calculates metrics per cutoff (window)
-    # resulting in MAE == RMSE for step_size=1
-    if 'cutoff' in eval_df.columns:
-        eval_df = eval_df.drop(columns=['cutoff'])
-
-    # Fix column names for quantiles (remove .0 suffix)
-    # utilsforecast expects 'NHITS-lo-80', but NeuralForecast outputs 'NHITS-lo-80.0'
-    rename_dict = {}
-    for col in eval_df.columns:
-        if col.endswith('.0'):
-            new_col = col.replace('.0', '')
-            rename_dict[col] = new_col
-            
-    if rename_dict:
-        print(f"Renaming columns for utilsforecast compatibility: {rename_dict}", flush=True)
-        eval_df = eval_df.rename(columns=rename_dict)
-        
-    # Define metrics
-    metrics = [mae, rmse, scaled_crps]
+    # Calculate Metrics manually as requested
+    print("Calculating metrics...", flush=True)
     
-    try:
-        print("Calculating metrics using utilsforecast...", flush=True)
-        # We pass level=[80] because our model was trained with quantiles 0.1, 0.5, 0.9
-        # which corresponds to an 80% prediction interval (10% to 90%).
-        # The columns NHITS-lo-80.0 and NHITS-hi-80.0 should exist.
-        evaluation_df = evaluate(
-            eval_df,
-            metrics=metrics,
-            models=['NHITS'],
-            target_col='y',
-            id_col='unique_id',
-            time_col='ds',
-            level=[80]
-        )
-        
-        print("Evaluation results:", evaluation_df, flush=True)
-        
-        # Aggregate results (mean over unique_ids)
-        summary = evaluation_df.drop(columns=['unique_id']).groupby('metric').mean().reset_index()
-        
-        mae_val = summary.loc[summary['metric'] == 'mae', 'NHITS'].values[0]
-        rmse_val = summary.loc[summary['metric'] == 'rmse', 'NHITS'].values[0]
-        crps_val = summary.loc[summary['metric'] == 'scaled_crps', 'NHITS'].values[0]
-        
-        print(f"Test MAE: {mae_val}")
-        print(f"Test RMSE: {rmse_val}")
-        print(f"Test Scaled CRPS: {crps_val}")
-        
-        # --- SUBSET EVALUATION (First 1000 samples) ---
-        # To compare with notebook results which evaluated on a subset
-        print("\n--- Subset Evaluation (First 1000 samples) ---")
-        subset_eval_df = eval_df.iloc[:1000].copy()
-        subset_evaluation_df = evaluate(
-            subset_eval_df,
-            metrics=metrics,
-            models=['NHITS'],
-            target_col='y',
-            id_col='unique_id',
-            time_col='ds',
-            level=[80]
-        )
-        subset_summary = subset_evaluation_df.drop(columns=['unique_id']).groupby('metric').mean().reset_index()
-        subset_mae = subset_summary.loc[subset_summary['metric'] == 'mae', 'NHITS'].values[0]
-        subset_rmse = subset_summary.loc[subset_summary['metric'] == 'rmse', 'NHITS'].values[0]
-        print(f"Subset MAE: {subset_mae}")
-        print(f"Subset RMSE: {subset_rmse}")
-        print("----------------------------------------------\n")
-        
-    except Exception as e:
-        print(f"Error using utilsforecast: {e}. Falling back to manual calculation.", flush=True)
-        # Fallback
-        y_true = forecasts['y']
-        y_pred = forecasts['NHITS-median'] if 'NHITS-median' in forecasts.columns else forecasts['NHITS']
-        from sklearn.metrics import mean_absolute_error, mean_squared_error
-        mae_val = mean_absolute_error(y_true, y_pred)
-        rmse_val = np.sqrt(mean_squared_error(y_true, y_pred))
-        crps_val = None
-        print(f"Test MAE: {mae_val}")
-        print(f"Test RMSE: {rmse_val}")
+    # Full Set Metrics
+    y_true = forecasts['y']
+    y_pred = forecasts['NHITS-median']
+    
+    # Use neuralforecast losses
+    mae_val = mae(y_true, y_pred)
+    rmse_val = rmse(y_true, y_pred)
+    
+    print(f"MAE: {mae_val:.4f}")
+    print(f"RMSE: {rmse_val:.4f}")
 
-    # Save Metrics
+    # Save Metrics (using Full Set results)
     metrics_list = [
         {
             "name": "mae",
@@ -218,13 +137,6 @@ def evaluate_nhits(model_dir, test_csv_path, metrics_output_path, plot_output_pa
         }
     ]
     
-    if crps_val is not None:
-        metrics_list.append({
-            "name": "scaled_crps",
-            "numberValue": float(crps_val),
-            "format": "RAW"
-        })
-        
     metrics = {"metrics": metrics_list}
     
     os.makedirs(os.path.dirname(metrics_output_path), exist_ok=True)
@@ -232,206 +144,34 @@ def evaluate_nhits(model_dir, test_csv_path, metrics_output_path, plot_output_pa
         json.dump(metrics, f)
     print(f"Metrics saved to {metrics_output_path}")
 
-    # Plotting
-    if plot_output_path:
-        plot_loss(model_dir, plot_output_path)
-        
-    if prediction_plot_path:
-        # Prepare metrics dictionary for display
-        metrics_dict = {
-            "MAE": mae_val,
-            "RMSE": rmse_val
-        }
-        if crps_val is not None:
-            metrics_dict["Scaled CRPS"] = crps_val
-            
-        plot_predictions(forecasts, prediction_plot_path, metrics_dict)
-
-def plot_loss(model_dir, output_path):
-    logs_dir = os.path.join(model_dir, "training_logs")
-    if not os.path.exists(logs_dir):
-        print("No training logs found.")
-        # Write placeholder to ensure artifact exists
-        with open(output_path, 'w') as f:
-            f.write("<html><body><h1>No training logs found</h1></body></html>")
-        return
-        
-    versions = [d for d in os.listdir(logs_dir) if d.startswith("version_")]
-    if not versions:
-        print("No version directory found in logs.")
-        with open(output_path, 'w') as f:
-            f.write("<html><body><h1>No version directory found in logs</h1></body></html>")
-        return
-        
-    # Sort versions to get the latest
-    versions.sort()
-    metrics_path = os.path.join(logs_dir, versions[-1], "metrics.csv")
-    
-    if not os.path.exists(metrics_path):
-        print(f"No metrics.csv found at {metrics_path}")
-        return
-        
-    print(f"Loading metrics from {metrics_path}...")
-    metrics_df = pd.read_csv(metrics_path)
-    
-    plt.figure(figsize=(10, 6))
-    
-    # Check for column names (PyTorch Lightning logger)
-    # Use 'step' as x-axis if available, otherwise use index (which might be mixed steps/epochs)
-    
-    # Filter for epoch-level metrics if possible to avoid the high-frequency noise of step-level loss
-    if 'epoch' in metrics_df.columns:
-        epoch_df = metrics_df.groupby('epoch').mean().reset_index()
-        if 'train_loss_epoch' in epoch_df.columns:
-             plt.plot(epoch_df['epoch'], epoch_df['train_loss_epoch'], label='Train Loss')
-        elif 'train_loss' in epoch_df.columns:
-             plt.plot(epoch_df['epoch'], epoch_df['train_loss'], label='Train Loss')
-             
-        if 'valid_loss' in epoch_df.columns:
-             plt.plot(epoch_df['epoch'], epoch_df['valid_loss'], label='Validation Loss')
-    else:
-        # Fallback to plotting everything (which looks noisy)
-        if 'train_loss_epoch' in metrics_df.columns:
-            plt.plot(metrics_df['train_loss_epoch'].dropna(), label='Train Loss')
-        elif 'train_loss' in metrics_df.columns:
-            plt.plot(metrics_df['train_loss'].dropna(), label='Train Loss')
-            
-        if 'valid_loss' in metrics_df.columns:
-            plt.plot(metrics_df['valid_loss'].dropna(), label='Validation Loss')
-        
-    plt.title('N-HiTS Training Loss')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.legend()
-    plt.grid(True)
-    
-    save_plot_html(output_path, "Training Loss")
 
 def plot_predictions(forecasts_df, output_path, metrics_dict=None):
-    # Prepare data for plotting
-    # Ensure we have actuals and predictions
-    
-    # Check for median or default
-    y_pred_col = 'NHITS-median' if 'NHITS-median' in forecasts_df.columns else 'NHITS'
-    
-    # Fallback logic
-    if y_pred_col not in forecasts_df.columns:
-         candidates = [c for c in forecasts_df.columns if c.startswith('NHITS') and '-lo-' not in c and '-hi-' not in c]
-         if candidates:
-             y_pred_col = candidates[0]
-    
-    # Extract arrays
-    actuals = forecasts_df['y'].values
-    predictions = forecasts_df[y_pred_col].values
-    ds = forecasts_df['ds'].values
-    
-    # Confidence Intervals
-    lo_col = None
-    hi_col = None
-    if 'NHITS-lo-80.0' in forecasts_df.columns: lo_col = 'NHITS-lo-80.0'
-    elif 'NHITS-lo-80' in forecasts_df.columns: lo_col = 'NHITS-lo-80'
-    
-    if 'NHITS-hi-80.0' in forecasts_df.columns: hi_col = 'NHITS-hi-80.0'
-    elif 'NHITS-hi-80' in forecasts_df.columns: hi_col = 'NHITS-hi-80'
+    # Plot a segment of the forecasts
+    plot_df = forecasts_df.iloc[:200] # First 200 predictions
 
-    # Create figure with GridSpec layout
-    # Top: Time Series (Full Width)
-    # Bottom: Density (Left), Residuals (Right)
-    fig = plt.figure(figsize=(16, 12))
-    gs = fig.add_gridspec(2, 2)
+    plt.figure(figsize=(15, 5))
+    plt.plot(plot_df['ds'], plot_df['y'], label='Actual MBT', color='black', alpha=0.7)
     
-    # --- Plot 1: Time Series (First 500 samples) ---
-    ax1 = fig.add_subplot(gs[0, :])
-    limit = 500
+    # Check for median column
+    y_pred_col = 'NHITS-median' if 'NHITS-median' in plot_df.columns else 'NHITS'
+    plt.plot(plot_df['ds'], plot_df[y_pred_col], label='Predicted Median MBT', color='blue', linewidth=2)
     
-    # Slice for time series plot
-    plot_ds = ds[:limit]
-    plot_actuals = actuals[:limit]
-    plot_preds = predictions[:limit]
+    # Updated to use 80% prediction interval columns (derived from 0.1 and 0.9 quantiles)
+    # Check for lo/hi columns
+    lo_col = 'NHITS-lo-80.0' if 'NHITS-lo-80.0' in plot_df.columns else 'NHITS-lo-80'
+    hi_col = 'NHITS-hi-80.0' if 'NHITS-hi-80.0' in plot_df.columns else 'NHITS-hi-80'
     
-    ax1.plot(plot_ds, plot_actuals, label='Actual', color='black', linewidth=1.5, alpha=1.0)
-    ax1.plot(plot_ds, plot_preds, label='Predicted', color='blue', linewidth=1.5, alpha=0.7)
-    
-    # Add confidence intervals if available
-    if lo_col and hi_col:
-        plot_lo = forecasts_df[lo_col].values[:limit]
-        plot_hi = forecasts_df[hi_col].values[:limit]
-        ax1.fill_between(plot_ds, plot_lo, plot_hi, color='blue', alpha=0.2, label='80% Confidence Interval')
+    if lo_col in plot_df.columns and hi_col in plot_df.columns:
+        plt.fill_between(plot_df['ds'], plot_df[lo_col], plot_df[hi_col], color='blue', alpha=0.2, label='80% Confidence Interval')
         
-    ax1.set_title(f'Time Series Prediction (First {limit} samples)')
-    ax1.set_xlabel('Time')
-    ax1.set_ylabel('Value')
-    ax1.legend()
-    ax1.grid(True, alpha=0.3)
+    plt.title('Subway Headway Prediction: Actual vs Predicted (with Uncertainty)')
+    plt.xlabel('Time')
+    plt.ylabel('Minutes Between Trains (MBT)')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
 
-    # --- Plot 2: Distribution of Actual vs Predicted ---
-    ax2 = fig.add_subplot(gs[1, 0])
-    
-    # Kernel Density Estimation
-    try:
-        # Remove NaNs for KDE
-        clean_actuals = actuals[~np.isnan(actuals)]
-        clean_preds = predictions[~np.isnan(predictions)]
-        
-        density_actual = gaussian_kde(clean_actuals)
-        density_pred = gaussian_kde(clean_preds)
-        
-        min_val = min(clean_actuals.min(), clean_preds.min())
-        max_val = max(clean_actuals.max(), clean_preds.max())
-        padding = (max_val - min_val) * 0.1
-        xs = np.linspace(min_val - padding, max_val + padding, 200)
-        
-        ax2.plot(xs, density_actual(xs), color='green', label='Actual')
-        ax2.fill_between(xs, density_actual(xs), color='green', alpha=0.3)
-        
-        ax2.plot(xs, density_pred(xs), color='orange', label='Predicted')
-        ax2.fill_between(xs, density_pred(xs), color='orange', alpha=0.3)
-    except Exception as e:
-        print(f"Could not plot KDE: {e}")
-        ax2.hist(actuals, bins=30, density=True, alpha=0.5, color='green', label='Actual')
-        ax2.hist(predictions, bins=30, density=True, alpha=0.5, color='orange', label='Predicted')
-    
-    ax2.set_title('Distribution of Actual vs Predicted Values')
-    ax2.set_xlabel('Value')
-    ax2.set_ylabel('Density')
-    ax2.legend()
-    ax2.grid(True, alpha=0.3)
-
-    # --- Plot 3: Residuals ---
-    ax3 = fig.add_subplot(gs[1, 1])
-    residuals = actuals - predictions
-    
-    # Remove NaNs
-    residuals = residuals[~np.isnan(residuals)]
-    
-    # Histogram
-    counts, bins, patches = ax3.hist(residuals, bins=30, density=False, color='purple', alpha=0.6, edgecolor='black')
-    
-    # KDE for residuals
-    try:
-        density_res = gaussian_kde(residuals)
-        min_res = residuals.min()
-        max_res = residuals.max()
-        padding_res = (max_res - min_res) * 0.1
-        xs_res = np.linspace(min_res - padding_res, max_res + padding_res, 200)
-        
-        curve = density_res(xs_res)
-        bin_width = bins[1] - bins[0]
-        scale_factor = len(residuals) * bin_width
-        
-        ax3.plot(xs_res, curve * scale_factor, color='purple', linewidth=2)
-    except:
-        pass
-    
-    ax3.axvline(x=0, color='black', linestyle='--', linewidth=2)
-    ax3.set_title('Distribution of Prediction Errors (Residuals)')
-    ax3.set_xlabel('Error (Actual - Predicted)')
-    ax3.set_ylabel('Count')
-    ax3.grid(True, alpha=0.3)
-    
-    plt.tight_layout()
-    
-    save_plot_html(output_path, "Prediction Plot", metrics_dict)
+    # Save the figure using the helper function to embed in HTML
+    save_plot_html(output_path, "Subway Headway Prediction", metrics_dict)
 
 def save_plot_html(output_path, title, metrics_dict=None):
     import base64
