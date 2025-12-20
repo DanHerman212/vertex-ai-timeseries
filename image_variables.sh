@@ -11,6 +11,3 @@ export PYTORCH_SERVING_IMAGE_URI="us-east1-docker.pkg.dev/${PROJECT_ID}/${REPO}/
 
 # 4. Ensure the one you want to BUILD is unset (so it generates a new tag/URI)
 unset PYTORCH_IMAGE_URI
-
-# 5. Run the deploy script
-./deploy_pipeline.sh
