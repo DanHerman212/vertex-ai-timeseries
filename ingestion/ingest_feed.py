@@ -3,6 +3,7 @@ import os
 import json
 import logging
 import requests
+import argparse
 from google.cloud import pubsub_v1
 from google.protobuf.json_format import MessageToDict
 from google.transit import gtfs_realtime_pb2
@@ -41,7 +42,7 @@ def fetch_feed():
         logging.error(f"Error fetching feed: {e}")
         return None
 
-def process_feed(content, publisher, topic_path):
+def process_feed(content, publisher, topic_path, dry_run=False):
     try:
         # Parse Protobuf
         feed = gtfs_realtime_pb2.FeedMessage()
@@ -56,6 +57,10 @@ def process_feed(content, publisher, topic_path):
         message_json = json.dumps(feed_dict)
         message_bytes = message_json.encode('utf-8')
         
+        if dry_run:
+            logging.info(f"[DRY RUN] Would publish message with {len(feed.entity)} entities. Size: {len(message_bytes)} bytes.")
+            return
+
         # Publish to Pub/Sub
         future = publisher.publish(topic_path, message_bytes)
         message_id = future.result()
@@ -66,11 +71,20 @@ def process_feed(content, publisher, topic_path):
         logging.error(f"Error processing/publishing feed: {e}")
 
 def main():
+    parser = argparse.ArgumentParser(description='MTA GTFS-Realtime Ingestion Service')
+    parser.add_argument('--dry-run', action='store_true', help='Run in dry-run mode (no publishing)')
+    args = parser.parse_args()
+
     # if not MTA_API_KEY:
     #     logging.warning("MTA_API_KEY is not set. Requests might fail if auth is required.")
 
-    publisher = get_pubsub_publisher()
-    topic_path = get_topic_path(publisher)
+    if args.dry_run:
+        logging.info("Running in DRY RUN mode. Messages will NOT be published.")
+        publisher = None
+        topic_path = "projects/DRY_RUN/topics/DRY_RUN"
+    else:
+        publisher = get_pubsub_publisher()
+        topic_path = get_topic_path(publisher)
     
     logging.info(f"Starting ingestion loop. Feed: {FEED_URL}")
     logging.info(f"Publishing to: {topic_path}")
@@ -81,7 +95,7 @@ def main():
         
         content = fetch_feed()
         if content:
-            process_feed(content, publisher, topic_path)
+            process_feed(content, publisher, topic_path, dry_run=args.dry_run)
         
         # Sleep for the remainder of the interval
         elapsed = time.time() - start_time
