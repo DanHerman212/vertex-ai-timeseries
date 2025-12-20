@@ -86,39 +86,28 @@ def evaluate_nhits(model_dir, test_csv_path, metrics_output_path, plot_output_pa
     if n_test_steps <= 0:
         raise ValueError(f"Test dataframe is too small ({len(test_df)}) for input_size ({input_size}).")
         
-    print(f"Forecasting {n_test_steps} steps using predict...", flush=True)
+    print(f"Forecasting using predict_insample...", flush=True)
     
     try:
-        # Split data into history (context) and future (ground truth)
-        # We use the loaded model weights (no refit) to predict the test period
-        history_df = test_df.iloc[:-n_test_steps]
-        future_df = test_df.iloc[-n_test_steps:]
+        # Use predict_insample to generate 1-step ahead forecasts using actual history
+        # This avoids recursive forecasting (which accumulates error and is slow/memory-intensive for large horizons)
+        # and correctly evaluates the model's ability to predict the next step given ground truth.
+        forecasts = nf.predict_insample(df=test_df)
         
-        print(f"History size: {len(history_df)}, Future size: {len(future_df)}", flush=True)
+        # Filter to keep only the 'test' portion (excluding the context buffer)
+        # The original script calculated n_test_steps based on a reserved context.
+        # We'll keep the last n_test_steps to be consistent.
+        if len(forecasts) > n_test_steps:
+             forecasts = forecasts.iloc[-n_test_steps:]
         
-        # Prepare future exogenous variables (futr_df)
-        # The model expects these columns for the forecast horizon
-        # We extract them from the future_df which contains the test set data
-        futr_df = future_df.drop(columns=['y']) if 'y' in future_df.columns else future_df
+        print(f"Forecasts generated. Shape: {forecasts.shape}", flush=True)
+        print("Forecast columns:", forecasts.columns.tolist(), flush=True)
         
-        # NOTE: We do NOT pass 'h' to predict() because NeuralForecast infers it from futr_df
-        # Passing 'h' explicitly when futr_df is present can cause issues in some versions
-        # or if passed incorrectly to internal methods.
-        # However, the error "TimeSeriesDataModule.__init__() got an unexpected keyword argument 'h'"
-        # suggests that 'h' is being passed down to the DataModule where it shouldn't be.
-        # This is likely a bug in the specific version of NeuralForecast being used or an API mismatch.
-        #
-        # Workaround: The safest way to predict with future exogenous variables is to use the 
-        # predict method but ensure we are strictly following the API.
-        # If 'h' is causing the issue, we can try omitting it if futr_df is provided, 
-        # as the horizon is implied by the length of futr_df.
-        
-        forecasts = nf.predict(df=history_df, futr_df=futr_df)
-        
-        # Merge actuals (y) from future_df into forecasts for metric calculation
-        # forecasts: [unique_id, ds, NHITS, ...]
-        # future_df: [unique_id, ds, y, ...]
-        forecasts = forecasts.merge(future_df[['unique_id', 'ds', 'y']], on=['unique_id', 'ds'], how='left')
+        # predict_insample returns 'y' (actuals) if present in input, so no need to merge
+        # But we ensure 'y' is present just in case
+        if 'y' not in forecasts.columns:
+             # Merge actuals if missing (unlikely)
+             forecasts = forecasts.merge(test_df[['unique_id', 'ds', 'y']], on=['unique_id', 'ds'], how='left')
             
     except Exception as e:
         print(f"CRITICAL ERROR during predict_insample: {e}", flush=True)

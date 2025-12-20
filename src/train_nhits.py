@@ -122,8 +122,8 @@ def train_and_save(model_dir, input_path, test_output_path=None, max_steps=1000)
     ]
     
     # Initialize NeuralForecast
-    # Use freq='S' (Second) to accommodate high-frequency/irregular data without aggregation
-    nf = NeuralForecast(models=models, freq='S')
+    # Use freq='H' to match the notebook configuration, even with sub-hourly data
+    nf = NeuralForecast(models=models, freq='H')
     
     # 3. Train Model
     print("Training NHITS model...")
