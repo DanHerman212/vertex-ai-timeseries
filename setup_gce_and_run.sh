@@ -59,7 +59,8 @@ gcloud compute ssh $INSTANCE_NAME --project=$PROJECT_ID --zone=$ZONE --command="
     
     # Create Subscription if not exists
     # We assume the topic 'vehicle-position-updates' exists. If not, this will fail.
-    # If the topic doesn't exist, we can't test the live feed anyway unless we start ingestion.
+    # If the topic doesn't exist, we can't test the live feed anyway unless westart ingestion.
+
     gcloud pubsub subscriptions create $SUBSCRIPTION_ID --topic=$TOPIC_ID || true
     
     echo 'Starting Streaming Pipeline...'

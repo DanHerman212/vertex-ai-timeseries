@@ -44,20 +44,6 @@ def evaluate_nhits(model_dir, test_csv_path, metrics_output_path, plot_output_pa
     try:
         nf = NeuralForecast.load(path=model_dir)
         print("Model loaded successfully.", flush=True)
-        
-        # CRITICAL FIX: Disable EarlyStopping for evaluation
-        # cross_validation creates a new Trainer. If early_stop_patience_steps is set, 
-        # it expects validation metrics (ptl/val_loss). With val_size=0, these aren't produced.
-        for model in nf.models:
-            print(f"Disabling EarlyStopping and Logger for model {model}...", flush=True)
-            model.early_stop_patience_steps = None
-            
-            # Disable Logger in trainer_kwargs to prevent "Missing folder" errors
-            # This ensures the new Trainer created by cross_validation doesn't try to log to the old path
-            if not hasattr(model, 'trainer_kwargs'):
-                model.trainer_kwargs = {}
-            model.trainer_kwargs['logger'] = False
-            model.trainer_kwargs['enable_checkpointing'] = False
             
     except Exception as e:
         print(f"Failed to load model: {e}", flush=True)
@@ -97,19 +83,22 @@ def evaluate_nhits(model_dir, test_csv_path, metrics_output_path, plot_output_pa
     if n_test_steps <= 0:
         raise ValueError(f"Test dataframe is too small ({len(test_df)}) for input_size ({input_size}).")
         
-    print(f"Forecasting {n_test_steps} steps using cross_validation...", flush=True)
+    print(f"Forecasting {n_test_steps} steps using predict...", flush=True)
     
     try:
-        # We use cross_validation to generate forecasts.
-        # By setting test_size = n_test_steps, it treats the last n_test_steps as the test set
-        # and the preceding data (which should be >= input_size) as the training/context set.
-        forecasts = nf.cross_validation(
-            df=test_df,
-            val_size=0, # We don't need a validation set for evaluation
-            test_size=n_test_steps,
-            n_windows=None,
-            step_size=1
-        )
+        # Split data into history (context) and future (ground truth)
+        # We use the loaded model weights (no refit) to predict the test period
+        history_df = test_df.iloc[:-n_test_steps]
+        future_df = test_df.iloc[-n_test_steps:]
+        
+        print(f"History size: {len(history_df)}, Future size: {len(future_df)}", flush=True)
+        
+        forecasts = nf.predict(df=history_df, h=n_test_steps)
+        
+        # Merge actuals (y) from future_df into forecasts for metric calculation
+        # forecasts: [unique_id, ds, NHITS, ...]
+        # future_df: [unique_id, ds, y, ...]
+        forecasts = forecasts.merge(future_df[['unique_id', 'ds', 'y']], on=['unique_id', 'ds'], how='left')
             
     except Exception as e:
         print(f"CRITICAL ERROR during predict_insample: {e}", flush=True)
