@@ -112,7 +112,7 @@ def train_and_save(model_dir, input_path, test_output_path=None, max_steps=1000)
             early_stop_patience_steps=10,
             val_check_steps=100,      # Check validation every 100 steps
             batch_size=256,           # Batch size (Aligned with GRU)
-            scaler_type='robust',     
+            scaler_type='standard',   # Changed to standard to match GRU model
             learning_rate=1e-3,
             n_pool_kernel_size=[2, 2, 2], 
             n_freq_downsample=[168, 24, 1],
