@@ -51,41 +51,6 @@ def evaluate_nhits(model_dir, test_csv_path, metrics_output_path, plot_output_pa
         print(f"Failed to load model: {e}", flush=True)
         raise e
     
-    # Determine input size from the loaded model to calculate test size
-    # nf.models is a list of models. We assume the first one.
-    input_size = nf.models[0].input_size
-    print(f"Model Input Size: {input_size}", flush=True)
-    
-    # Check for required columns (based on model configuration)
-    # We can't easily inspect the model's exog list from here without digging into private attributes
-    # but we can check if the dataframe looks reasonable.
-    
-    # Calculate the number of steps to predict
-    # The test_df contains [lookback_window + actual_test_data]
-    # We want to predict the actual_test_data
-    # We must also account for the validation set (val_size=10) used in cross_validation
-    # AND ensure we have strictly more than input_size for the training window
-    
-    # NOTE: train_nhits.py exports the file with a buffer of (input_size + 20) before the test set.
-    # So the "Test Set" effectively starts after that buffer.
-    # However, we don't know the exact buffer size here.
-    # But we know we want to predict everything that is NOT the initial lookback window.
-    # Let's assume we want to predict everything after the first input_size steps.
-    
-    # Actually, cross_validation takes 'test_size'.
-    # We must ensure the remaining data (context) is large enough for the model to train (input_size + horizon).
-    # We reserve input_size + 10 steps for context to avoid "No windows available" errors.
-    
-    # min_context = input_size + 10
-    # n_test_steps = len(test_df) - min_context
-    # print(f"Total rows in test_df: {len(test_df)}", flush=True)
-    # print(f"Reserved Context: {min_context}", flush=True)
-    # print(f"Expected test steps: {n_test_steps}", flush=True)
-    
-    # if n_test_steps <= 0:
-    #     raise ValueError(f"Test dataframe is too small ({len(test_df)}) for input_size ({input_size}).")
-        
-    print(f"Forecasting using cross_validation...", flush=True)
     
     try:
         # Use user requested setup
