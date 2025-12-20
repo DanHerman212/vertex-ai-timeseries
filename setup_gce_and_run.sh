@@ -34,12 +34,13 @@ else
     echo "Subscription $SUBSCRIPTION_ID already exists."
 fi
 
-# 1. Create GCE Instance
-echo "Creating GCE instance..."
-# Check if instance exists
+# 1. Create/Start GCE Instance
+echo "Configuring GCE instance..."
 if gcloud compute instances describe $INSTANCE_NAME --project=$PROJECT_ID --zone=$ZONE > /dev/null 2>&1; then
-    echo "Instance $INSTANCE_NAME already exists. Skipping creation."
+    echo "Instance $INSTANCE_NAME exists. Ensuring it is running..."
+    gcloud compute instances start $INSTANCE_NAME --project=$PROJECT_ID --zone=$ZONE || true
 else
+    echo "Creating instance $INSTANCE_NAME..."
     gcloud compute instances create $INSTANCE_NAME \
         --project=$PROJECT_ID \
         --zone=$ZONE \
