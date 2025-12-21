@@ -12,6 +12,8 @@ from matplotlib.dates import DateFormatter
 from scipy.stats import gaussian_kde
 from sklearn.metrics import mean_absolute_error
 from google.cloud import storage
+import base64
+from io import BytesIO
 
 def evaluate_gru(model_dir, test_ds):
     print("Evaluating GRU Model...")
