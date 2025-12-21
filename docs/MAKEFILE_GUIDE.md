@@ -43,7 +43,15 @@ make setup-gce
 ```
 *Under the hood: Runs `scripts/setup_gce_and_run.sh`*
 
-### 5. Stop GCE Services
+### 5. Test Streaming Pipeline (Dry Run)
+Connects to the GCE instance and runs the streaming pipeline in "dry run" mode. This verifies that the pipeline can consume messages from Pub/Sub and perform transformations, but **skips** the actual prediction endpoint (Vertex AI) and Firestore writes. Useful for integration testing before the model is deployed.
+
+```bash
+make test-streaming
+```
+*Under the hood: Runs `scripts/test_streaming_dryrun.sh`*
+
+### 6. Stop GCE Services
 Stops the ingestion services and related processes on the GCE instance to save costs or pause data collection.
 
 ```bash
