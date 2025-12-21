@@ -23,13 +23,10 @@ The repo is nearly complete and is expected to finish before the end of DEC 2025
 
 ```
 nhits_gcp_workflow/
-├── deploy_pipeline.sh                  # Shell script to deploy the Vertex AI pipeline
+├── Makefile                            # Main entry point for running tasks (deploy, test, etc.)
 ├── pipeline.py                         # Definition of the Vertex AI pipeline structure
 ├── README.md                           # Project overview and instructions
-├── requirements.nhits.txt              # Python dependencies for NHITS training
-├── requirements.txt                    # General Python dependencies for the project
 ├── submit_pipeline.py                  # Script to submit the pipeline job to Vertex AI
-├── test_fix_locally.sh                 # Script to run local tests for the pipeline components
 ├── weather_data.csv                    # Dataset used for training/testing
 ├── docker/                             # Docker configuration files
 │   ├── Dockerfile                      # Default Dockerfile for the project
@@ -50,6 +47,16 @@ nhits_gcp_workflow/
 │   ├── ingest_feed.py
 │   ├── mta-ingestion.service
 │   └── requirements.txt
+├── requirements/                       # Python dependency files
+│   ├── requirements.nhits.txt          # Dependencies for NHITS training
+│   └── requirements.txt                # General project dependencies
+├── scripts/                            # Operational scripts
+│   ├── deploy_pipeline.sh              # Script to deploy the Vertex AI pipeline
+│   ├── image_variables.sh              # Environment variables for Docker images
+│   ├── setup_gce_and_run.sh            # Script to setup GCE instance
+│   ├── stop_vm_pipeline.sh             # Script to stop GCE services
+│   ├── test_container_local.sh         # Script to run containerized tests
+│   └── test_local_workflow.sh          # Script to run local python tests
 ├── src/                                # Source code for pipeline components
 │   ├── evaluate_gru.py                 # Component for evaluating GRU model
 │   ├── evaluate_nhits.py               # Component for evaluating NHITS model
@@ -63,17 +70,12 @@ nhits_gcp_workflow/
 │   ├── pipeline.py
 │   ├── prediction.py
 │   ├── sink.py
-│   ├── streaming_pipeline_v1.py
 │   ├── test_transform.py
 │   └── transform.py
 └── training_and_preprocessing_workflows/ # Jupyter notebooks for experimentation
-    ├── 39_neuralforecast.ipynb
-    ├── full_clean_ml_datset.csv
     ├── ml_dataset_preprocessing.ipynb
-    ├── ml_dec_17.csv
     ├── model_utils.py
     ├── nhits_training_workflow.ipynb
     ├── plot_timeseries.py
-    ├── storage_key.json
     └── tensorflow_lstm_gru_workflow.ipynb
 ```

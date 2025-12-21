@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y \
 RUN pip install uv
 
 # Copy requirements
-COPY requirements.nhits.txt .
+COPY requirements/requirements.nhits.txt .
 # Install torch < 2.6 to avoid weights_only=True default in 2.6+ which breaks NeuralForecast loading
 RUN uv pip install --system "torch<2.6"
 # Add pandas/matplotlib explicitly if not in requirements (they usually are dependencies but good to be safe)

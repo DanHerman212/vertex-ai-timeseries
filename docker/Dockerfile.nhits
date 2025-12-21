@@ -9,7 +9,7 @@ ENV PYTHONUNBUFFERED=1
 RUN pip install uv
 
 # Install python dependencies
-COPY requirements.nhits.txt .
+COPY requirements/requirements.nhits.txt .
 RUN uv pip install --system --no-cache -r requirements.nhits.txt
 
 # Copy training code

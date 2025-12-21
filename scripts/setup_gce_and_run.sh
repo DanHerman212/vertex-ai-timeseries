@@ -72,7 +72,7 @@ gcloud compute ssh $INSTANCE_NAME --project=$PROJECT_ID --zone=$ZONE --command="
     python3 -m venv venv
     source venv/bin/activate
     
-    pip install -r requirements.txt
+    pip install -r requirements/requirements.txt
     
     # --- Setup Ingestion Service (Producer) ---
     echo "Setting up Ingestion Service..."

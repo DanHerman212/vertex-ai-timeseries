@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y build-essential git
 RUN pip install uv
 
 # Install python dependencies
-COPY requirements.txt .
+COPY requirements/requirements.txt .
 RUN uv pip install --system --no-cache -r requirements.txt
 
 # Copy training code and data
