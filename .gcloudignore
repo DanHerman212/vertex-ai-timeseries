@@ -4,6 +4,7 @@
 # Explicitly allow directories
 !docker/
 !ingestion/
+!requirements/
 !src/
 !streaming/
 !tests/
