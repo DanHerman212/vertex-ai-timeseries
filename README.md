@@ -6,6 +6,8 @@ This repo includes end to end pipelines for time series forecasting on Vertex AI
   <img src="images/vertexaipipelines.png" alt="Image Description">
 </div>
 
+For detailed instructions on running commands, see the [Project Operations Guide](docs/MAKEFILE_GUIDE.md).
+
 ## Overview
 The pipeline consists of the following steps:
 1. **Extract**: Retrieve time series data from BigQuery 
