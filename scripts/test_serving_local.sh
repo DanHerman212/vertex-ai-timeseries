@@ -49,21 +49,43 @@ echo "========================================================"
 echo "TEST: Prediction"
 echo "========================================================"
 
-# Create a dummy payload
-# NeuralForecast expects a list of dicts or a dict with "instances" key
-# We need to provide enough history for the model to predict? 
-# Actually, NHITS usually needs the input window.
-# Let's try sending a small payload. If it fails with shape error, at least we know the server is up.
+# Create a dummy payload with required features
+# We use python to generate the JSON because it's cleaner
+python3 -c '
+import json
+import pandas as pd
+import numpy as np
 
-cat <<EOF > payload.json
-{
-  "instances": [
-    {"ds": "2025-01-01 10:00:00", "y": 10.0, "unique_id": "L"},
-    {"ds": "2025-01-01 10:15:00", "y": 12.0, "unique_id": "L"},
-    {"ds": "2025-01-01 10:30:00", "y": 15.0, "unique_id": "L"}
-  ]
-}
-EOF
+# Generate timestamps
+dates = pd.date_range(start="2025-01-01 10:00:00", periods=161, freq="15min")
+
+data = []
+for i, date in enumerate(dates):
+    row = {
+        "ds": str(date),
+        "unique_id": "L",
+        "y": 10.0 + np.sin(i/10.0), # Dummy target
+        # Required Exogenous Features
+        "temp": 70.0,
+        "precip": 0.0,
+        "snow": 0.0,
+        "snowdepth": 0.0,
+        "visibility": 10.0,
+        "windspeed": 5.0,
+        "dow": 1 if date.weekday() >= 5 else 0,
+        # Historical Features (needed for model input size)
+        "rolling_mean_10": 10.0,
+        "rolling_std_10": 1.0,
+        "rolling_mean_50": 10.0,
+        "rolling_std_50": 1.0,
+        "rolling_max_10": 12.0,
+        "duration": 15.0
+    }
+    data.append(row)
+
+payload = {"instances": data}
+print(json.dumps(payload))
+' > payload.json
 
 curl -X POST \
     -H "Content-Type: application/json" \

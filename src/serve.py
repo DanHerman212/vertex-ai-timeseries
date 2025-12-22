@@ -57,7 +57,32 @@ async def predict(request: Request):
             
         # NeuralForecast predict requires a dataframe with history.
         # It will predict 'h' steps into the future for each unique_id found in df.
-        forecast = model.predict(df=df)
+        
+        # Handle Future Exogenous Variables
+        # We assume the client sends History + Future rows.
+        # We split the dataframe based on the model's horizon.
+        
+        # Get the first model (we assume only one model is loaded for serving)
+        inner_model = model.models[0]
+        horizon = inner_model.h
+        
+        # Check if model uses future exogenous variables
+        uses_future_exog = hasattr(inner_model, 'futr_exog_list') and inner_model.futr_exog_list and len(inner_model.futr_exog_list) > 0
+        
+        if uses_future_exog:
+            # Split into history and future
+            # The last 'horizon' rows are treated as future
+            if len(df) <= horizon:
+                 return {"error": f"Input length ({len(df)}) must be greater than horizon ({horizon}) when using future exogenous variables."}
+            
+            hist_df = df.iloc[:-horizon].reset_index(drop=True)
+            futr_df = df.tail(horizon).reset_index(drop=True)
+            
+            print(f"Predicting with Future Exog. History: {len(hist_df)}, Future: {len(futr_df)}")
+            forecast = model.predict(df=hist_df, futr_df=futr_df)
+        else:
+            # Standard prediction
+            forecast = model.predict(df=df)
         
         # Return results
         return {"predictions": forecast.to_dict(orient="records")}
