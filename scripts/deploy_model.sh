@@ -79,6 +79,11 @@ MODEL_ID=$(gcloud ai models upload \
 
 echo "Model uploaded. ID: $MODEL_ID"
 
+if [ -z "$MODEL_ID" ]; then
+    echo "Error: Failed to capture MODEL_ID. Model upload may have failed."
+    exit 1
+fi
+
 # 5. Create Endpoint and Deploy
 echo "[5/5] Creating Endpoint and Deploying Model..."
 
@@ -94,7 +99,14 @@ if [ -z "$EXISTING_ENDPOINT_ID" ]; then
         --region=$REGION \
         --display-name=$ENDPOINT_NAME \
         --format="value(name)")
-else
+if [ -z "$ENDPOINT_ID" ]; then
+    echo "Error: Failed to capture ENDPOINT_ID."
+    exit 1
+fi
+
+echo "Deploying model to endpoint $ENDPOINT_ID..."
+echo "Debug: MODEL_ID=$MODEL_ID"
+
     echo "Using existing endpoint: $EXISTING_ENDPOINT_ID"
     ENDPOINT_ID=$EXISTING_ENDPOINT_ID
 fi
