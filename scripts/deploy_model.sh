@@ -68,29 +68,87 @@ docker push "$REPO_URI:$IMAGE_TAG"
 # 4. Upload Model to Vertex AI
 echo "[4/5] Uploading Model to Vertex AI Registry..."
 
-# Run command and capture output to a temporary file to debug errors
-gcloud ai models upload \
-    --region=$REGION \
-    --display-name=$MODEL_NAME \
-    --container-image-uri="$REPO_URI:$IMAGE_TAG" \
-    --artifact-uri="$GCS_MODEL_URI" \
-    --container-predict-route="/predict" \
-    --container-health-route="/health" \
-    --container-ports=8080 \
-    --format="value(name)" > model_id.txt 2> model_error.txt
+# Check for existing model to upload as a new version
+EXISTING_MODEL_NAME=$(gcloud ai models list --region=$REGION --filter="display_name=$MODEL_NAME" --format="value(name)" | head -n 1)
 
-EXIT_CODE=$?
+if [ -n "$EXISTING_MODEL_NAME" ]; then
+    echo "Found existing model: $EXISTING_MODEL_NAME"
+    echo "Uploading as a new version..."
+    
+    gcloud ai models upload \
+        --region=$REGION \
+        --parent-model=$EXISTING_MODEL_NAME \
+        --display-name=$MODEL_NAME \
+        --container-image-uri="$REPO_URI:$IMAGE_TAG" \
+        --artifact-uri="$GCS_MODEL_URI" \
+        --container-predict-route="/predict" \
+        --container-health-route="/health" \
+        --container-ports=8080 \
+        --format="value(name)" > model_id.txt 2> model_error.txt
+        
+    EXIT_CODE=$?
+    
+    if [ $EXIT_CODE -ne 0 ]; then
+        echo "Error: Model version upload failed. Details:"
+        cat model_error.txt
+        rm model_id.txt model_error.txt
+        exit 1
+    fi
+    
+    # When uploading a version, the output name is the Model ID (not versioned).
+    # We need to fetch the latest version ID.
+    BASE_MODEL_ID=$(cat model_id.txt)
 
-if [ $EXIT_CODE -ne 0 ]; then
-    echo "Error: Model upload failed. Details:"
-    cat model_error.txt
-    rm model_id.txt model_error.txt
-    exit 1
+    # Fallback: If output is empty, use the known existing model ID
+    if [ -z "$BASE_MODEL_ID" ]; then
+        echo "Warning: Command output empty. Using known Model ID: $EXISTING_MODEL_NAME"
+        BASE_MODEL_ID=$EXISTING_MODEL_NAME
+    fi
+    
+    # Fetch the latest version ID (sort by createTime descending)
+    LATEST_VERSION_ID=$(gcloud ai models list-versions $BASE_MODEL_ID --region=$REGION --format="value(versionId)" --sort-by="~createTime" | head -n 1)
+    
+    if [ -z "$LATEST_VERSION_ID" ]; then
+        echo "Error: Could not determine new version ID."
+        exit 1
+    fi
+    
+    # Construct the versioned model ID for deployment
+    MODEL_ID="${BASE_MODEL_ID}@${LATEST_VERSION_ID}"
+    echo "Uploaded new version: $MODEL_ID"
+
+else
+    echo "Creating new model..."
+    
+    gcloud ai models upload \
+        --region=$REGION \
+        --display-name=$MODEL_NAME \
+        --container-image-uri="$REPO_URI:$IMAGE_TAG" \
+        --artifact-uri="$GCS_MODEL_URI" \
+        --container-predict-route="/predict" \
+        --container-health-route="/health" \
+        --container-ports=8080 \
+        --format="value(name)" > model_id.txt 2> model_error.txt
+
+    EXIT_CODE=$?
+
+    if [ $EXIT_CODE -ne 0 ]; then
+        echo "Error: Model upload failed. Details:"
+        cat model_error.txt
+        rm model_id.txt model_error.txt
+        exit 1
+    fi
+
+    MODEL_ID=$(cat model_id.txt)
+    
+    # Fallback: If output is empty, try to find the model by name
+    if [ -z "$MODEL_ID" ]; then
+        echo "Warning: Command output empty. Searching for model by name..."
+        MODEL_ID=$(gcloud ai models list --region=$REGION --filter="display_name=$MODEL_NAME" --format="value(name)" --sort-by="~createTime" | head -n 1)
+    fi
+
+    echo "Model uploaded. ID: $MODEL_ID"
 fi
-
-MODEL_ID=$(cat model_id.txt)
-
-echo "Model uploaded. ID: $MODEL_ID"
 
 if [ -z "$MODEL_ID" ]; then
     echo "Error: Failed to capture MODEL_ID. Model upload may have failed (even with exit code 0)."
