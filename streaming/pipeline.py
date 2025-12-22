@@ -106,7 +106,7 @@ def run(argv=None):
         else:
             # In dry run, just print the predictions to stdout
             (predictions
-                | "PrintPredictions" >> beam.Map(lambda x: logging.info(f"PREDICTION: {x}"))
+                | "PrintPredictions" >> beam.Map(lambda x: logging.info(f"PREDICTION: Key={x.get('key')} | Forecast={x.get('forecast')}"))
             )
 
 if __name__ == '__main__':

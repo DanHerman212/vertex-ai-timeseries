@@ -183,7 +183,18 @@ class VertexAIPrediction(beam.DoFn):
         if self.dry_run:
             logging.info(f"DRY RUN: Generated {len(instances)} instances for {key}")
             if instances:
-                logging.info(f"Sample Feature Vector: {instances[-1]}")
+                latest = instances[-1]
+                # Create a structured, readable log message for the latest feature vector
+                msg = (
+                    f"\n🔍 FEATURE VECTOR SNAPSHOT ({key}):\n"
+                    f"   📅 Timestamp: {latest.get('ds')}\n"
+                    f"   ⏱️  Duration:  {latest.get('duration', 0):.2f} min\n"
+                    f"   📉 Target (y): {latest.get('y', 0):.2f} min\n"
+                    f"   📊 Rolling(10): Mean={latest.get('rolling_mean_10', 0):.2f}, Std={latest.get('rolling_std_10', 0):.2f}\n"
+                    f"   🌤️  Weather: Temp={latest.get('temp')}°F, Wind={latest.get('windspeed')} mph"
+                )
+                logging.info(msg)
+            
             # Yield a dummy prediction to keep the pipeline flowing if needed
             yield {
                 'key': key,
