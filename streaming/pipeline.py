@@ -45,6 +45,10 @@ def run(argv=None):
         '--dry_run',
         action='store_true',
         help='If set, skips Vertex AI prediction and Firestore write.')
+    parser.add_argument(
+        '--skip_firestore',
+        action='store_true',
+        help='If set, skips Firestore write but performs Vertex AI prediction.')
     
     known_args, pipeline_args = parser.parse_known_args(argv)
     pipeline_options = PipelineOptions(pipeline_args)
@@ -96,7 +100,7 @@ def run(argv=None):
         )
 
         # 6. Write to Firestore
-        if not known_args.dry_run:
+        if not known_args.dry_run and not known_args.skip_firestore:
             (predictions
                 | "WriteToFirestore" >> beam.ParDo(WriteToFirestore(
                     project_id=known_args.project_id,
@@ -104,7 +108,7 @@ def run(argv=None):
                 ))
             )
         else:
-            # In dry run, just print the predictions to stdout
+            # In dry run or skip_firestore, just print the predictions to stdout
             (predictions
                 | "PrintPredictions" >> beam.Map(lambda x: logging.info(f"PREDICTION: Key={x.get('key')} | Forecast={x.get('forecast')}"))
             )
