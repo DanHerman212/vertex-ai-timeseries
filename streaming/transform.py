@@ -9,7 +9,14 @@ class ParseVehicleUpdates(beam.DoFn):
     """
     Parses raw JSON messages from the subway feed and extracts relevant vehicle updates.
     Filters for specific route and stop IDs (origin and target).
+    Uses stateful processing to deduplicate logs for the same trip at the same stop.
     """
+    # State to track the last seen timestamp for a (trip_id, stop_id) pair
+    # We key by trip_id in the pipeline, but here we are in a ParDo that takes raw JSON.
+    # Wait, ParseVehicleUpdates is the first step, it takes raw bytes/string. It's not keyed yet.
+    # We cannot use Beam State here easily without keying first.
+    # However, we can move the logging/deduplication to the NEXT step (CalculateTripDuration) which IS keyed by trip_id.
+    
     def __init__(self, target_route_id="E", origin_stop_id="G05S", target_stop_id="F11S"):
         self.target_route_id = target_route_id
         self.origin_stop_id = origin_stop_id
@@ -29,15 +36,7 @@ class ParseVehicleUpdates(beam.DoFn):
             if 'entity' not in data:
                 return
 
-            entity_count = len(data.get('entity', []))
-            # logging.info(f"Received message with {entity_count} entities")
-
             for entity in data['entity']:
-                # We check both 'vehicle' and 'trip_update' for arrival times
-                # For simplicity, let's assume we use 'vehicle' updates for now as per original code
-                # But we might need to look at trip_update for future predictions if needed.
-                # Sticking to original logic of looking at 'vehicle' for actual positions.
-                
                 if 'vehicle' not in entity:
                     continue
                 
@@ -56,16 +55,15 @@ class ParseVehicleUpdates(beam.DoFn):
                         timestamp = data.get('header', {}).get('timestamp')
 
                     if timestamp:
-                        # Key by trip_id to correlate origin and target visits
                         trip_id = trip.get('trip_id')
                         if trip_id:
-                            logging.info(f"Found match: Route {route_id}, Stop {stop_id}, Trip {trip_id}")
+                            # We yield everything to the next step, which handles stateful deduplication
                             yield (trip_id, {
                                 'route_id': route_id,
                                 'stop_id': stop_id,
                                 'timestamp': int(timestamp),
                                 'trip_id': trip_id,
-                                'status': vehicle.get('current_status')
+                                'status': vehicle.get('current_status', 'UNKNOWN')
                             })
 
         except json.JSONDecodeError:
@@ -79,12 +77,17 @@ class CalculateTripDuration(beam.DoFn):
     Keys by trip_id.
     """
     ORIGIN_TS = ReadModifyWriteStateSpec('origin_ts', PickleCoder())
+    LAST_LOGGED_ORIGIN = ReadModifyWriteStateSpec('last_logged_origin', PickleCoder())
+    LAST_LOGGED_TARGET = ReadModifyWriteStateSpec('last_logged_target', PickleCoder())
 
     def __init__(self, origin_stop_id="G05S", target_stop_id="F11S"):
         self.origin_stop_id = origin_stop_id
         self.target_stop_id = target_stop_id
 
-    def process(self, element, origin_ts_state=beam.DoFn.StateParam(ORIGIN_TS)):
+    def process(self, element, 
+                origin_ts_state=beam.DoFn.StateParam(ORIGIN_TS),
+                last_logged_origin=beam.DoFn.StateParam(LAST_LOGGED_ORIGIN),
+                last_logged_target=beam.DoFn.StateParam(LAST_LOGGED_TARGET)):
         """
         element: (trip_id, update_dict)
         """
@@ -92,11 +95,20 @@ class CalculateTripDuration(beam.DoFn):
         stop_id = update['stop_id']
         timestamp = update['timestamp']
         route_id = update['route_id']
+        status = update.get('status', 'UNKNOWN')
+        
+        # Format timestamp for logging
+        ts_str = datetime.fromtimestamp(timestamp).strftime('%H:%M:%S')
 
         if stop_id == self.origin_stop_id:
             # Store origin timestamp
             origin_ts_state.write(timestamp)
-            logging.info(f"Observed Origin: Route {route_id}, Stop {stop_id}, Trip {trip_id}")
+            
+            # Deduplicate logging
+            last_ts = last_logged_origin.read()
+            if last_ts != timestamp:
+                logging.info(f"🚆 ARRIVAL @ ORIGIN: Trip {trip_id} | Stop {stop_id} | Status {status} | Time {ts_str}")
+                last_logged_origin.write(timestamp)
         
         elif stop_id == self.target_stop_id:
             # Check if we have an origin timestamp
@@ -109,7 +121,13 @@ class CalculateTripDuration(beam.DoFn):
                 if duration_minutes > 0:
                     # Key by route_stop for the next aggregation step
                     key = f"{route_id}_{stop_id}"
-                    logging.info(f"Calculated duration: {duration_minutes:.2f} min for Trip {trip_id}")
+                    
+                    # Deduplicate logging
+                    last_ts = last_logged_target.read()
+                    if last_ts != timestamp:
+                        logging.info(f"🏁 ARRIVAL @ TARGET: Trip {trip_id} | Stop {stop_id} | Status {status} | Time {ts_str} | Duration {duration_minutes:.2f} min")
+                        last_logged_target.write(timestamp)
+
                     yield (key, {
                         'timestamp': timestamp,
                         'duration': duration_minutes
