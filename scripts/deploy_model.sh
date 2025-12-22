@@ -69,15 +69,21 @@ docker push "$REPO_URI:$IMAGE_TAG"
 echo "[4/5] Uploading Model to Vertex AI Registry..."
 
 # Check for existing model to upload as a new version
-EXISTING_MODEL_NAME=$(gcloud ai models list --region=$REGION --filter="display_name=$MODEL_NAME" --format="value(name)" | head -n 1)
+EXISTING_MODEL_RAW=$(gcloud ai models list --region=$REGION --filter="display_name=$MODEL_NAME" --format="value(name)" | head -n 1)
 
-if [ -n "$EXISTING_MODEL_NAME" ]; then
-    echo "Found existing model: $EXISTING_MODEL_NAME"
-    echo "Uploading as a new version..."
+if [ -n "$EXISTING_MODEL_RAW" ]; then
+    # Ensure we have just the ID (handle case where gcloud returns full path or just ID)
+    EXISTING_MODEL_ID=${EXISTING_MODEL_RAW##*/}
+    
+    # Construct the full resource name required by --parent-model
+    FULL_PARENT_MODEL_NAME="projects/$PROJECT_ID/locations/$REGION/models/$EXISTING_MODEL_ID"
+    
+    echo "Found existing model ID: $EXISTING_MODEL_ID"
+    echo "Uploading as a new version to: $FULL_PARENT_MODEL_NAME"
     
     gcloud ai models upload \
         --region=$REGION \
-        --parent-model=$EXISTING_MODEL_NAME \
+        --parent-model=$FULL_PARENT_MODEL_NAME \
         --display-name=$MODEL_NAME \
         --container-image-uri="$REPO_URI:$IMAGE_TAG" \
         --artifact-uri="$GCS_MODEL_URI" \
@@ -100,8 +106,8 @@ if [ -n "$EXISTING_MODEL_NAME" ]; then
 
     # Fallback: If output is empty, use the known existing model ID
     if [ -z "$BASE_MODEL_ID" ]; then
-        echo "Warning: Command output empty. Using known Model ID: $EXISTING_MODEL_NAME"
-        BASE_MODEL_ID=$EXISTING_MODEL_NAME
+        echo "Warning: Command output empty. Using known Model ID: $EXISTING_MODEL_ID"
+        BASE_MODEL_ID=$EXISTING_MODEL_ID
     fi
     
     # Fetch the latest version ID (sort by createTime descending)
