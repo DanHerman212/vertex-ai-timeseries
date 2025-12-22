@@ -36,42 +36,25 @@ Before running any code, we need the GCP resources.
 
 ---
 
-## Phase 2: Test Deployment (Local)
+## Phase 2: Test Deployment (Automated)
 
-We will run the components locally to verify logic before deploying to the cloud.
+We use a `Makefile` to automate the deployment of the ingestion service to a GCE instance and run the pipeline in "dry-run" mode to verify logic.
 
-### Step 1: Test Ingestion (Feed -> Pub/Sub)
-Run the ingestion script locally to start pumping real data into the topic.
+### Step 1: Setup & Run
+Run the following command to:
+1.  Create/Start the GCE instance.
+2.  Deploy the Ingestion Service (Producer).
+3.  Run the Streaming Pipeline (Consumer) in dry-run mode.
 
-1.  **Install Dependencies**:
-    ```bash
-    pip install -r ingestion/requirements.txt
-    ```
-2.  **Run Script**:
-    ```bash
-    export PROJECT_ID="time-series-478616"
-    export TOPIC_ID="vehicle-position-updates"
-    python ingestion/ingest_feed.py
-    ```
-3.  **Verify**: Check the Pub/Sub topic in GCP Console to see messages arriving.
+```bash
+make setup-gce
+```
 
-### Step 2: Test Processing (Pub/Sub -> Pipeline -> Firestore)
-Run the Beam pipeline locally (DirectRunner) to process the live stream.
-
-1.  **Install Dependencies**:
-    ```bash
-    pip install -r requirements.txt
-    ```
-2.  **Run Pipeline**:
-    ```bash
-    python streaming/pipeline.py \
-      --project_id "time-series-478616" \
-      --region "us-east1" \
-      --input_subscription "projects/time-series-478616/subscriptions/vehicle-position-updates-sub" \
-      --endpoint_id "YOUR_VERTEX_ENDPOINT_ID" \
-      --weather_csv "weather_data.csv"
-    ```
-    *(Note: You need the actual `endpoint_id` from your deployed model)*
+### Step 2: Verify Output
+The command will stream logs to your terminal. Look for:
+*   `Received message with X entities`
+*   `Found match: Route E...`
+*   `Calculated duration: ...`
 
 ---
 
@@ -79,20 +62,14 @@ Run the Beam pipeline locally (DirectRunner) to process the live stream.
 
 Once Phase 2 is verified:
 
-### Step 1: Deploy Ingestion to GCE
-1.  Provision `e2-micro` VM.
-2.  Copy `ingestion/` folder.
-3.  Install systemd service (`ingestion/mta-ingestion.service`).
+### Step 1: Deploy Pipeline to Dataflow
+Submit the job to Dataflow runner using the automated script:
 
-### Step 2: Deploy Pipeline to Dataflow
-1.  Submit the job to Dataflow runner.
-    ```bash
-    python streaming/pipeline.py \
-      --runner DataflowRunner \
-      --project "time-series-478616" \
-      --region "us-east1" \
-      --temp_location "gs://YOUR_BUCKET/temp" \
-      --staging_location "gs://YOUR_BUCKET/staging" \
-      --input_subscription "projects/time-series-478616/subscriptions/vehicle-position-updates-sub" \
-      ...
-    ```
+```bash
+make deploy-streaming
+```
+
+This will:
+1.  Build the pipeline package.
+2.  Submit a job to Google Cloud Dataflow.
+3.  Run continuously, scaling workers as needed.

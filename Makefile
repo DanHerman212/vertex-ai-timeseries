@@ -30,12 +30,6 @@ setup-gce:
 	@chmod +x scripts/setup_gce_and_run.sh
 	@./scripts/setup_gce_and_run.sh
 
-# Run the streaming pipeline in dry-run mode on the GCE instance
-test-streaming:
-	@echo "🌊 Running Streaming Pipeline (Dry Run)..."
-	@chmod +x scripts/test_streaming_dryrun.sh
-	@./scripts/test_streaming_dryrun.sh
-
 # Stop the GCE instance and services
 stop:
 	@echo "🛑 Stopping GCE Services..."

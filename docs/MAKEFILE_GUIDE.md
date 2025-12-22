@@ -35,20 +35,21 @@ make test-container
 ```
 *Under the hood: Runs `scripts/test_container_local.sh`*
 
-### 4. Setup GCE Instance
-Provisions and configures a Google Compute Engine (GCE) instance for the data ingestion service. It handles VM creation, file transfer, and service startup.
+### 4. Setup GCE Instance & Test Streaming
+Provisions and configures a Google Compute Engine (GCE) instance for the data ingestion service. It handles VM creation, file transfer, service startup, and **automatically starts the streaming pipeline in dry-run mode** to verify connectivity.
 
 ```bash
 make setup-gce
 ```
 *Under the hood: Runs `scripts/setup_gce_and_run.sh`*
 
-### 5. Test Streaming Pipeline (Dry Run)
-Connects to the GCE instance and runs the streaming pipeline in "dry run" mode. This verifies that the pipeline can consume messages from Pub/Sub and perform transformations, but **skips** the actual prediction endpoint (Vertex AI) and Firestore writes. Useful for integration testing before the model is deployed.
+### 5. Stop GCE Services
+Stops the ingestion service and the GCE instance to save costs.
 
 ```bash
-make test-streaming
+make stop
 ```
+*Under the hood: Runs `scripts/stop_vm_pipeline.sh`*
 *Under the hood: Runs `scripts/test_streaming_dryrun.sh`*
 
 ### 6. Stop GCE Services
