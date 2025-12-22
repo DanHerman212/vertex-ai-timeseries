@@ -102,15 +102,11 @@ def run(argv=None):
                     project_id=known_args.project_id,
                     collection_name=known_args.output_collection
                 ))
-            )        else:
+            )
+        else:
             # In dry run, just print the predictions to stdout
             (predictions
                 | "PrintPredictions" >> beam.Map(lambda x: logging.info(f"PREDICTION: {x}"))
-            )
-        else:
-            # In dry run, just log the predictions
-            (predictions
-                | "LogPredictions" >> beam.Map(lambda x: logging.info(f"Dry Run Prediction: {x}"))
             )
 
 if __name__ == '__main__':
