@@ -29,6 +29,9 @@ class ParseVehicleUpdates(beam.DoFn):
             if 'entity' not in data:
                 return
 
+            entity_count = len(data.get('entity', []))
+            # logging.info(f"Received message with {entity_count} entities")
+
             for entity in data['entity']:
                 # We check both 'vehicle' and 'trip_update' for arrival times
                 # For simplicity, let's assume we use 'vehicle' updates for now as per original code
@@ -56,6 +59,7 @@ class ParseVehicleUpdates(beam.DoFn):
                         # Key by trip_id to correlate origin and target visits
                         trip_id = trip.get('trip_id')
                         if trip_id:
+                            logging.info(f"Found match: Route {route_id}, Stop {stop_id}, Trip {trip_id}")
                             yield (trip_id, {
                                 'route_id': route_id,
                                 'stop_id': stop_id,
@@ -104,6 +108,7 @@ class CalculateTripDuration(beam.DoFn):
                 if duration_minutes > 0:
                     # Key by route_stop for the next aggregation step
                     key = f"{route_id}_{stop_id}"
+                    logging.info(f"Calculated duration: {duration_minutes:.2f} min for Trip {trip_id}")
                     yield (key, {
                         'timestamp': timestamp,
                         'duration': duration_minutes

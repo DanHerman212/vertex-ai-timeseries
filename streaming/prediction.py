@@ -36,7 +36,7 @@ class VertexAIPrediction(beam.DoFn):
         # Initialize Weather Fetcher if API key is present
         if self.weather_api_key:
             self.weather_fetcher = WeatherFetcher(self.weather_api_key)
-            logging.info("WeatherFetcher initialized.")
+            logging.debug("WeatherFetcher initialized.")
         
         # Load weather data if provided (Fallback)
         if self.weather_csv_path:
@@ -49,7 +49,7 @@ class VertexAIPrediction(beam.DoFn):
                     self.weather_df = self.weather_df.sort_values('datetime')
                     # Set index for fast lookup
                     self.weather_df.set_index('datetime', inplace=True)
-                logging.info("Weather data loaded successfully.")
+                logging.debug("Weather data loaded successfully.")
             except Exception as e:
                 logging.warning(f"Could not load weather data: {e}. Using defaults.")
 

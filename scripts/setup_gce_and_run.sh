@@ -46,7 +46,7 @@ else
         --zone=$ZONE \
         --machine-type=e2-standard-2 \
         --scopes=https://www.googleapis.com/auth/cloud-platform \
-        --image-family=debian-11 \
+        --image-family=debian-12 \
         --image-project=debian-cloud
 fi
 
@@ -106,6 +106,9 @@ gcloud compute ssh $INSTANCE_NAME --project=$PROJECT_ID --zone=$ZONE --command="
     
     # Go back to workspace
     cd ~/nhits_workflow
+    
+    # Set logging level to INFO to see the output
+    export PYTHONLOGLEVEL=info
     
     python3 -m streaming.pipeline \
         --project_id=$PROJECT_ID \
