@@ -1,10 +1,12 @@
 # ML Pipelines for Time Series Forecasting on Vertex AI
 ## Challenger/Champion ML Workflow with NHITS and GRU Models
-This repo includes end to end pipelines for time series forecasting on Vertex AI.<br>  
+This repo includes end to end machine learning pipelines for time series forecasting on Vertex AI.<br>  
 
-The pipeline trains two models to execute a prediction task.  The prediction task centers around the public transit domain for the NYC subway system.  The target prediction is minutes until the next train arrives, at a particular station, to help passengers manage uncertainty in planning their commute.  The two models comprise of a simple RNN to train on sequences of 36 hours of subway arrivals to provide point estimates, compared to a probabalistic model that uses quantile regression to predict specific points in the probability distribution of future arrivals, including the 10th, 50th, and 90th percentiles.
-<br>
-<br> The first model is a traditional RNN using a stacked and regularlized GRU architecture with TensorFlow and Keras.  The second is a N-HiTS model, which is a state of the art multi-stack MLP, that uses hierarchical interpolation and multi-rate sampling to handle different timescales, deployed with NeuralForecast. <br><br> The pipeline is designed to run on Vertex AI using Kubeflow Pipelines (KFP) and leverages GPU acceleration for model training.
+The forecasting task centers around the public transit domain for the NYC subway system.  The target forecast is minutes until the next train arrives, at a particular station, to help passengers manage uncertainty in planning their commute.<br>
+
+The data representation from the subway system is generated from censors on subway vehicles, at high frequency with irregular intervals.  Given the complexity of the data, we train two different models with distinct architectures to gain perspective on what's possible with deep learning. <br>
+
+The first model is a traditional RNN using a stacked and regularlized GRU architecture with TensorFlow and Keras.  The second is a N-HiTS model, which is a state of the art multi-stack MLP, that uses hierarchical interpolation and multi-rate sampling to handle different timescales, deployed with NeuralForecast. <br><br> The pipeline is designed to run on Vertex AI using Kubeflow Pipelines (KFP) and leverages GPU acceleration for model training.
 
 <div align="center">
   <img src="images/vertexaipipelines.png" alt="Image Description">
