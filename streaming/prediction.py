@@ -115,10 +115,6 @@ class VertexAIPrediction(beam.DoFn):
 
         # 1. Calculate MBT (Minutes Between Trains)
         data = []
-        # We need to align durations with timestamps. 
-        # Assuming durations[i] corresponds to timestamps[i]
-        # MBT at i is (timestamps[i] - timestamps[i-1])
-        
         for i in range(1, len(timestamps)):
             t_curr = timestamps[i]
             t_prev = timestamps[i-1]
@@ -172,11 +168,7 @@ class VertexAIPrediction(beam.DoFn):
         else:
             logging.info(f"✅ Input history complete ({current_history} rows). Status: {prediction_status}")
 
-        logging.info(f"Calculated MBT for {len(df)} intervals. Last MBT: {df.iloc[-1]['y']:.2f} min")
-        
-        # 2. Feature Engineering
-        
-        # A. Rolling Features (Endogenous)
+        # 2. Feature Engineering (Rolling Stats)
         # Note: We use min_periods=1 to ensure we get values even at the start of the window
         df['rolling_mean_10'] = df['y'].rolling(window=10, min_periods=1).mean()
         df['rolling_std_10'] = df['y'].rolling(window=10, min_periods=1).std().fillna(0)
@@ -184,29 +176,81 @@ class VertexAIPrediction(beam.DoFn):
         df['rolling_mean_50'] = df['y'].rolling(window=50, min_periods=1).mean()
         df['rolling_std_50'] = df['y'].rolling(window=50, min_periods=1).std().fillna(0)
         
-        # B. Cyclic Features (Calendar) - Commented out as per user request
-        # minutes_in_week = 7 * 24 * 60
-        # minutes_in_day = 24 * 60 | Status: {prediction_status}:\n"
-                    f"   📅 Timestamp: {latest.get('ds')}\n"
-                    f"   ⏱️  Duration:  {latest.get('duration', 0):.2f} min\n"
-                    f"   📉 Target (y): {latest.get('y', 0):.2f} min\n"
-                    f"   📊 Rolling(10): Mean={latest.get('rolling_mean_10', 0):.2f}, Std={latest.get('rolling_std_10', 0):.2f}\n"
-                    f"   🌤️  Weather: Temp={latest.get('temp')}°F, Wind={latest.get('windspeed')} mph"
+        # 3. Append Future Row (for Exogenous Features)
+        # The model needs to know the weather/calendar for the NEXT timestamp to predict it.
+        last_ts = df['ds'].iloc[-1]
+        # We assume the next arrival is roughly the average MBT away, or just 15 mins.
+        # Since these are exogenous features (weather/day of week), exact minute doesn't matter too much.
+        future_ts = last_ts + pd.Timedelta(minutes=15)
+        
+        # Create a future row with NaNs for target/rolling, but valid unique_id and ds
+        future_row = {
+            'ds': future_ts,
+            'unique_id': key.split('_')[0],
+            'y': 0.0, # Dummy
+            'duration': 0.0, # Dummy
+            'rolling_mean_10': 0.0, 'rolling_std_10': 0.0, 'rolling_max_10': 0.0,
+            'rolling_mean_50': 0.0, 'rolling_std_50': 0.0
+        }
+        
+        # Append to DF temporarily to process weather in one go (or just append to list)
+        # Actually, let's just append it to the dataframe
+        df = pd.concat([df, pd.DataFrame([future_row])], ignore_index=True)
+        
+        # 4. Weather & Calendar Features (for ALL rows, including future)
+        # This is inefficient to do row-by-row for 161 rows every time, but safe.
+        # Optimization: Vectorize this later.
+        
+        weather_data = []
+        for ts in df['ds']:
+            feats = self.get_weather_features(ts)
+            # Add Calendar features
+            feats['dow'] = 1 if ts.weekday() >= 5 else 0 # 1=Weekend, 0=Weekday
+            weather_data.append(feats)
+            
+        weather_df = pd.DataFrame(weather_data)
+        df = pd.concat([df, weather_df], axis=1)
+        
+        # 5. Prepare Instances for Vertex AI
+        # Convert timestamps to strings for JSON serialization
+        df['ds'] = df['ds'].astype(str)
+        
+        # Select only necessary columns (to reduce payload size)
+        required_cols = [
+            'ds', 'unique_id', 'y', 'duration',
+            'rolling_mean_10', 'rolling_std_10', 'rolling_max_10', 
+            'rolling_mean_50', 'rolling_std_50',
+            'temp', 'precip', 'snow', 'snowdepth', 'visibility', 'windspeed', 'dow'
+        ]
+        
+        # Filter columns that actually exist
+        final_cols = [c for c in required_cols if c in df.columns]
+        instances = df[final_cols].to_dict(orient='records')
+
+        if self.dry_run:
+            logging.info(f"DRY RUN: Generated {len(instances)} instances for {key}")
+            if instances:
+                # Log the FUTURE row (last one)
+                latest = instances[-1]
+                msg = (
+                    f"\n🔍 FUTURE VECTOR SNAPSHOT ({key}):\n"
+                    f"   📅 Target Time: {latest.get('ds')}\n"
+                    f"   🌤️  Weather: Temp={latest.get('temp')}°F, Wind={latest.get('windspeed')} mph\n"
+                    f"   📅 DOW: {latest.get('dow')}"
                 )
                 logging.info(msg)
             
-            # Yield a dummy prediction to keep the pipeline flowing if needed
             yield {
                 'key': key,
                 'input_last_timestamp': element['last_timestamp'],
                 'prediction_status': prediction_status,
-                'forecast': [0.0], # Dummy forecast (Horizon=1)
+                'forecast': [0.0], 
                 'dry_run_features': instances
             }
             return
 
         try:
-            # 4. Call Endpoint
+            # 6. Call Endpoint
             prediction = self.endpoint.predict(instances=instances)
             forecast = prediction.predictions
             
@@ -215,42 +259,7 @@ class VertexAIPrediction(beam.DoFn):
             yield {
                 'key': key,
                 'input_last_timestamp': element['last_timestamp'],
-                'prediction_status': prediction_status
-        
-        if self.dry_run:
-            logging.info(f"DRY RUN: Generated {len(instances)} instances for {key}")
-            if instances:
-                latest = instances[-1]
-                # Create a structured, readable log message for the latest feature vector
-                msg = (
-                    f"\n🔍 FEATURE VECTOR SNAPSHOT ({key}):\n"
-                    f"   📅 Timestamp: {latest.get('ds')}\n"
-                    f"   ⏱️  Duration:  {latest.get('duration', 0):.2f} min\n"
-                    f"   📉 Target (y): {latest.get('y', 0):.2f} min\n"
-                    f"   📊 Rolling(10): Mean={latest.get('rolling_mean_10', 0):.2f}, Std={latest.get('rolling_std_10', 0):.2f}\n"
-                    f"   🌤️  Weather: Temp={latest.get('temp')}°F, Wind={latest.get('windspeed')} mph"
-                )
-                logging.info(msg)
-            
-            # Yield a dummy prediction to keep the pipeline flowing if needed
-            yield {
-                'key': key,
-                'input_last_timestamp': element['last_timestamp'],
-                'forecast': [0.0], # Dummy forecast (Horizon=1)
-                'dry_run_features': instances
-            }
-            return
-
-        try:
-            # 4. Call Endpoint
-            prediction = self.endpoint.predict(instances=instances)
-            forecast = prediction.predictions
-            
-            logging.info(f"🔮 PREDICTION RECEIVED for {key}: {forecast}")
-
-            yield {
-                'key': key,
-                'input_last_timestamp': element['last_timestamp'],
+                'prediction_status': prediction_status,
                 'forecast': forecast
             }
             
