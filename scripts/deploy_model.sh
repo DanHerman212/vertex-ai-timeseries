@@ -89,14 +89,18 @@ if [ $EXIT_CODE -ne 0 ]; then
 fi
 
 MODEL_ID=$(cat model_id.txt)
-rm model_id.txt model_error.txt
 
 echo "Model uploaded. ID: $MODEL_ID"
 
 if [ -z "$MODEL_ID" ]; then
-    echo "Error: Failed to capture MODEL_ID. Model upload may have failed."
+    echo "Error: Failed to capture MODEL_ID. Model upload may have failed (even with exit code 0)."
+    echo "Output from stderr:"
+    cat model_error.txt
+    rm model_id.txt model_error.txt
     exit 1
 fi
+
+rm model_id.txt model_error.txt
 
 # 5. Create Endpoint and Deploy
 echo "[5/5] Creating Endpoint and Deploying Model..."
