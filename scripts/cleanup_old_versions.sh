@@ -32,7 +32,7 @@ echo "Model ID: $MODEL_ID"
 # 2. Get Latest Version
 echo "Identifying latest version..."
 # Get version ID with max createTime
-LATEST_VERSION_ID=$(gcloud ai models list-versions $MODEL_ID --region=$REGION --format="json" | python3 -c "import sys, json; print(max([int(v['versionId']) for v in json.load(sys.stdin)]))")
+LATEST_VERSION_ID=$(gcloud ai models list-version $MODEL_ID --region=$REGION --format="json" | python3 -c "import sys, json; print(max([int(v['versionId']) for v in json.load(sys.stdin)]))")
 
 echo "Latest Version is: $LATEST_VERSION_ID"
 echo "Keeping version $LATEST_VERSION_ID. All others will be deleted."
@@ -93,7 +93,7 @@ fi
 # 4. Delete Old Versions
 echo "Deleting old versions from Registry..."
 # List all versions
-VERSIONS=$(gcloud ai models list-versions $MODEL_ID --region=$REGION --format="value(versionId)")
+VERSIONS=$(gcloud ai models list-version $MODEL_ID --region=$REGION --format="value(versionId)")
 
 for v in $VERSIONS; do
     if [ "$v" != "$LATEST_VERSION_ID" ]; then
