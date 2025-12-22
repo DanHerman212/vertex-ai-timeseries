@@ -84,14 +84,13 @@ if [ -n "$EXISTING_MODEL_NAME" ]; then
         --container-predict-route="/predict" \
         --container-health-route="/health" \
         --container-ports=8080 \
-        --format="value(name)" > model_id.txt 2> model_error.txt
+        --format="value(name)" > model_id.txt
         
     EXIT_CODE=$?
     
     if [ $EXIT_CODE -ne 0 ]; then
-        echo "Error: Model version upload failed. Details:"
-        cat model_error.txt
-        rm model_id.txt model_error.txt
+        echo "Error: Model version upload failed."
+        rm model_id.txt
         exit 1
     fi
     
@@ -128,14 +127,13 @@ else
         --container-predict-route="/predict" \
         --container-health-route="/health" \
         --container-ports=8080 \
-        --format="value(name)" > model_id.txt 2> model_error.txt
+        --format="value(name)" > model_id.txt
 
     EXIT_CODE=$?
 
     if [ $EXIT_CODE -ne 0 ]; then
-        echo "Error: Model upload failed. Details:"
-        cat model_error.txt
-        rm model_id.txt model_error.txt
+        echo "Error: Model upload failed."
+        rm model_id.txt
         exit 1
     fi
 
@@ -152,13 +150,11 @@ fi
 
 if [ -z "$MODEL_ID" ]; then
     echo "Error: Failed to capture MODEL_ID. Model upload may have failed (even with exit code 0)."
-    echo "Output from stderr:"
-    cat model_error.txt
-    rm model_id.txt model_error.txt
+    rm model_id.txt
     exit 1
 fi
 
-rm model_id.txt model_error.txt
+rm model_id.txt
 
 # 5. Create Endpoint and Deploy
 echo "[5/5] Creating Endpoint and Deploying Model..."
