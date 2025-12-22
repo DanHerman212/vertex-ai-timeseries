@@ -25,7 +25,7 @@ The pipeline is designed to predict the **Minutes Between Trains (MBT)** for the
     2.  Iterates through all entities.
     3.  **Filters:** Keeps only updates for:
         *   **Route:** `E`
-        *   **Stops:** Origin (`G05S` - Jamaica Center) OR Target (`F11S` - 7th Ave).
+        *   **Stops:** Origin (`G05S` - Jamaica Center–Parsons/Archer) OR Target (`F11S` - Lexington Av/53 St).
     4.  **Status Check:** Captures both `STOPPED_AT` (actual arrival) and `UNKNOWN` (often scheduled/future) statuses for logging, but downstream logic relies on timestamps.
 
 ### Step 3: Duration Calculation (Stateful)
