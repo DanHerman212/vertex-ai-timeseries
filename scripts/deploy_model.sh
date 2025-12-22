@@ -120,9 +120,6 @@ if [ -n "$EXISTING_MODEL_RAW" ]; then
         echo "Error: Could not determine new version ID."
         exit 1
     fi
-        echo "Error: Could not determine new version ID."
-        exit 1
-    fi
     
     # Construct the versioned model ID for deployment
     MODEL_ID="${BASE_MODEL_ID}@${LATEST_VERSION_ID}"
