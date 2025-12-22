@@ -96,6 +96,7 @@ class CalculateTripDuration(beam.DoFn):
         if stop_id == self.origin_stop_id:
             # Store origin timestamp
             origin_ts_state.write(timestamp)
+            logging.info(f"Observed Origin: Route {route_id}, Stop {stop_id}, Trip {trip_id}")
         
         elif stop_id == self.target_stop_id:
             # Check if we have an origin timestamp
@@ -160,9 +161,12 @@ class AccumulateArrivals(beam.DoFn):
             
             # Emit window if we have enough data (e.g., > 10)
             if len(current_history) >= 10:
+                logging.info(f"Accumulated {len(current_history)} arrivals for {key}. Emitting window.")
                 yield {
                     'key': key,
                     'timestamps': [x['timestamp'] for x in current_history],
                     'durations': [x['duration'] for x in current_history],
                     'last_timestamp': current_history[-1]['timestamp']
                 }
+            else:
+                logging.info(f"Accumulated {len(current_history)} arrivals for {key}. Waiting for more data...")

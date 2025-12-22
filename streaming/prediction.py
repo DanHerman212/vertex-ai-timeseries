@@ -137,6 +137,7 @@ class VertexAIPrediction(beam.DoFn):
             })
             
         df = pd.DataFrame(data)
+        logging.info(f"Calculated MBT for {len(df)} intervals. Last MBT: {df.iloc[-1]['y']:.2f} min")
         
         # 2. Feature Engineering
         
