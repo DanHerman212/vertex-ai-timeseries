@@ -8,7 +8,8 @@ from diagrams.gcp.ml import AIPlatform
 main_graph_attr = {
     "fontsize": "45",
     "bgcolor": "white",
-    "labelloc": "t"
+    "labelloc": "t",
+    "dpi": "300"
 }
 
 cluster_attr = {
