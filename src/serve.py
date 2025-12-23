@@ -36,7 +36,35 @@ def load_model():
     actual_model_path = base_path
     found = False
     
-    if os.path.exists(base_path):
+    if base_path.startswith("gs://"):
+        import gcsfs
+        fs = gcsfs.GCSFileSystem()
+        try:
+            # List files recursively
+            logger.info(f"Listing contents of GCS path: {base_path}")
+            # glob returns full paths
+            files = fs.glob(f"{base_path}/**")
+            for full_path in files:
+                logger.info(f"Found file: {full_path}")
+                file_name = os.path.basename(full_path)
+                
+                if file_name == "NHITS_0.ckpt" or file_name == "dataset.pkl":
+                    if not found:
+                        # Get parent directory
+                        # fs.glob returns path without gs:// prefix usually, but let's be careful
+                        # We need to reconstruct the gs:// URI for the directory
+                        parent_dir = os.path.dirname(full_path)
+                        if not parent_dir.startswith("gs://"):
+                            actual_model_path = f"gs://{parent_dir}"
+                        else:
+                            actual_model_path = parent_dir
+                            
+                        found = True
+                        logger.info(f"✅ Detected model directory at: {actual_model_path}")
+        except Exception as e:
+            logger.error(f"Error listing GCS files: {e}")
+            
+    elif os.path.exists(base_path):
         logger.info(f"Listing contents of {base_path}:")
         for root, dirs, files in os.walk(base_path):
             for file in files:
