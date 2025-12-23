@@ -177,8 +177,9 @@ class AccumulateArrivals(beam.DoFn):
             for item in current_history:
                 history_state.add(item)
             
-            # Emit window if we have enough data (e.g., > 10)
-            if len(current_history) >= 10:
+            # Emit window if we have enough data (e.g., > 1)
+            # We need at least 2 timestamps to calculate MBT (Minutes Between Trains)
+            if len(current_history) >= 2:
                 logging.info(f"Accumulated {len(current_history)} arrivals for {key}. Emitting window.")
                 yield {
                     'key': key,
@@ -187,4 +188,4 @@ class AccumulateArrivals(beam.DoFn):
                     'last_timestamp': current_history[-1]['timestamp']
                 }
             else:
-                logging.info(f"Accumulated {len(current_history)} arrivals for {key}. Waiting for more data...")
+                logging.info(f"Accumulated {len(current_history)} arrivals for {key}. Waiting for more data (need min 2)...")
