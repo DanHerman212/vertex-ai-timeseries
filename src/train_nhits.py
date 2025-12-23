@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import torch
 import json
+import pickle
 import base64
 from io import BytesIO
 from neuralforecast import NeuralForecast
@@ -119,6 +120,20 @@ def train_and_save(model_dir, input_path, df_output_path=None, logs_dir=None):
         
     print(f"Saving model to {model_dir}...")
     nf.save(path=model_dir, model_index=None, overwrite=True)
+
+    # Verify artifacts
+    print(f"Verifying artifacts in {model_dir}...")
+    try:
+        saved_files = os.listdir(model_dir)
+        print(f"Files in model_dir: {saved_files}")
+        
+        if 'dataset.pkl' not in saved_files:
+            print("WARNING: dataset.pkl not found. Saving manually.")
+            with open(os.path.join(model_dir, 'dataset.pkl'), 'wb') as f:
+                pickle.dump(nf.dataset, f)
+            print("Manually saved dataset.pkl")
+    except Exception as e:
+        print(f"Error verifying/saving artifacts: {e}")
     
     # 5. Save Full Data
     if df_output_path:
