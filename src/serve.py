@@ -6,6 +6,12 @@ import pandas as pd
 from neuralforecast import NeuralForecast
 # Explicitly import NHITS to ensure it's available for unpickling
 from neuralforecast.models import NHITS
+from neuralforecast.core import MODEL_FILENAME_DICT
+
+# Patch MODEL_FILENAME_DICT to handle uppercase 'NHITS'
+# The saved model seems to reference 'NHITS' but the registry has 'nhits'
+if 'NHITS' not in MODEL_FILENAME_DICT:
+    MODEL_FILENAME_DICT['NHITS'] = NHITS
 
 # Configure logging
 logging.basicConfig(
