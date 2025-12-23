@@ -191,17 +191,33 @@ else
 fi
 
 echo "Deploying model to endpoint $ENDPOINT_ID..."
-gcloud ai endpoints deploy-model "$ENDPOINT_ID" \
+if gcloud ai endpoints deploy-model "$ENDPOINT_ID" \
     --region=$REGION \
     --model="$MODEL_ID" \
     --display-name="$MODEL_NAME-deployment" \
     --machine-type="n1-standard-2" \
     --min-replica-count=1 \
     --max-replica-count=1 \
-    --traffic-split="0=100"
+    --traffic-split="0=100"; then
 
-echo "========================================================"
-echo "Deployment Complete!"
-echo "Endpoint ID: $ENDPOINT_ID"
-echo "You can now update your pipeline configuration to use this endpoint."
-echo "========================================================"
+    echo "========================================================"
+    echo "Deployment Operation Completed Successfully."
+    echo "Fetching container logs to confirm startup..."
+    echo "========================================================"
+    sleep 10
+    gcloud logging read "resource.type=aiplatform.googleapis.com/Endpoint AND resource.labels.endpoint_id=$ENDPOINT_ID" --limit=20 --format="value(textPayload,jsonPayload.message)" --order=desc
+    
+    echo "========================================================"
+    echo "Endpoint ID: $ENDPOINT_ID"
+    echo "You can now update your pipeline configuration to use this endpoint."
+    echo "========================================================"
+
+else
+    echo "========================================================"
+    echo "Deployment Failed!"
+    echo "Fetching container logs to diagnose..."
+    echo "========================================================"
+    sleep 5
+    gcloud logging read "resource.type=aiplatform.googleapis.com/Endpoint AND resource.labels.endpoint_id=$ENDPOINT_ID" --limit=30 --format="value(textPayload,jsonPayload.message)" --order=desc
+    exit 1
+fi
