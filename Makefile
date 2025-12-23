@@ -42,6 +42,12 @@ teardown:
 	@chmod +x scripts/teardown_gce.sh
 	@./scripts/teardown_gce.sh
 
+# Deploy the ingestion service to GCE (Production)
+deploy-ingestion:
+	@echo "☁️ Deploying Ingestion Service to GCE..."
+	@chmod +x scripts/deploy_ingestion.sh
+	@./scripts/deploy_ingestion.sh
+
 # Deploy the streaming pipeline to Dataflow (Production)
 deploy-streaming:
 	@echo "🌊 Deploying Streaming Pipeline to Dataflow..."
