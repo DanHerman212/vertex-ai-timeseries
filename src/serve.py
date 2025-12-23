@@ -31,28 +31,19 @@ def load_model():
     
     logger.info(f"Base model path from env: {base_path}")
     
-    # 1. Use the base path directly, but list contents for debugging
+    # 1. Use the base path directly
+    # We rely on NeuralForecast to handle the GCS path or local path
     actual_model_path = base_path
     
-    if base_path.startswith("gs://"):
-        try:
-            import gcsfs
-            fs = gcsfs.GCSFileSystem()
-            logger.info(f"Listing contents of GCS path: {base_path}")
-            files = fs.ls(base_path)
-            for f in files:
-                logger.info(f"Found file: {f}")
-        except Exception as e:
-            logger.error(f"Error listing GCS files: {e}")
-            
-    elif os.path.exists(base_path):
+    # Debug logging for local paths only (GCS listing can be flaky with permissions)
+    if not base_path.startswith("gs://") and os.path.exists(base_path):
         logger.info(f"Listing contents of {base_path}:")
         for root, dirs, files in os.walk(base_path):
             for file in files:
                 full_path = os.path.join(root, file)
                 logger.info(f"Found file: {full_path}")
-    else:
-        logger.error(f"Base path {base_path} does not exist!")
+    elif not base_path.startswith("gs://"):
+        logger.warning(f"Local base path {base_path} does not exist!")
 
     # 2. Load the model
     logger.info(f"Attempting to load model from: {actual_model_path}")
