@@ -17,7 +17,8 @@ REGION="us-east1"  # Default region
 MODEL_NAME="nhits-forecast-model"
 ENDPOINT_NAME="nhits-prediction-endpoint-v2"
 ARTIFACT_BUCKET="${PROJECT_ID}-vertex-artifacts"
-IMAGE_REPO="nhits-serving"
+IMAGE_REPO="ml-pipelines"
+IMAGE_NAME="pytorch-serving"
 IMAGE_TAG="latest"
 LOCAL_MODEL_DIR="local_test_artifacts/nhits_model"
 
@@ -50,7 +51,7 @@ echo "[2/5] Uploading model artifacts to $GCS_MODEL_URI..."
 gsutil -m cp -r "${LOCAL_MODEL_DIR}/*" "$GCS_MODEL_URI/"
 
 # 3. Build and Push Serving Image
-REPO_URI="${REGION}-docker.pkg.dev/${PROJECT_ID}/${IMAGE_REPO}/serving"
+REPO_URI="${REGION}-docker.pkg.dev/${PROJECT_ID}/${IMAGE_REPO}/${IMAGE_NAME}"
 echo "[3/5] Building and Pushing Docker Image to $REPO_URI..."
 
 # Create repository if it doesn't exist
