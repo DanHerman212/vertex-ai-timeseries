@@ -6,23 +6,12 @@ ifneq (,$(wildcard .env))
     export
 endif
 
-# Deploy the pipeline to Vertex AI
+# Deploy the pipeline to Vertex AI for ML training
 deploy:
 	@echo "🚀 Deploying Pipeline..."
 	@chmod +x scripts/deploy_pipeline.sh
 	@./scripts/deploy_pipeline.sh
 
-# Run the local workflow test (Python based)
-test:
-	@echo "🧪 Running Local Workflow Test..."
-	@chmod +x scripts/test_local_workflow.sh
-	@./scripts/test_local_workflow.sh
-
-# Run the local container test (Docker based)
-test-container:
-	@echo "🐳 Running Local Container Test..."
-	@chmod +x scripts/test_container_local.sh
-	@./scripts/test_container_local.sh
 
 # Setup and run the GCE instance for ingestion
 setup-gce:

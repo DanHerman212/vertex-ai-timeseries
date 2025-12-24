@@ -29,6 +29,7 @@ echo "Subscription: $SUBSCRIPTION_ID"
 if [ -n "$ENDPOINT_ID" ]; then
     echo "Vertex AI Endpoint: $ENDPOINT_ID ($REGION)"
 fi
+echo "Dataflow Jobs: All active jobs in $REGION will be cancelled"
 echo "========================================================"
 
 read -p "Are you sure you want to delete these resources? (y/N) " -n 1 -r
@@ -88,6 +89,22 @@ if [ -n "$ENDPOINT_ID" ]; then
     fi
 else
     echo "ENDPOINT_ID not set in .env, skipping Vertex AI cleanup."
+fi
+
+# 5. Cancel Dataflow Jobs
+echo "Checking for running Dataflow jobs..."
+# List jobs that are running, draining, or pending
+JOBS=$(gcloud dataflow jobs list --project=$PROJECT_ID --region=$REGION --status=active --format="value(JOB_ID)")
+
+if [ -n "$JOBS" ]; then
+    echo "Found active Dataflow jobs. Cancelling..."
+    for JOB_ID in $JOBS; do
+        echo "Cancelling job $JOB_ID..."
+        gcloud dataflow jobs cancel $JOB_ID --project=$PROJECT_ID --region=$REGION --quiet
+    done
+    echo "All active jobs cancelled."
+else
+    echo "No active Dataflow jobs found."
 fi
 
 echo "--------------------------------------------------------"
