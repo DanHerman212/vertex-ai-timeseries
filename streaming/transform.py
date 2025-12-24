@@ -140,7 +140,7 @@ class CalculateTripDuration(beam.DoFn):
 
 class AccumulateArrivals(beam.DoFn):
     """
-    Stateful DoFn that accumulates the last 150 arrival timestamps and durations.
+    Stateful DoFn that accumulates the last 161 arrival timestamps and durations.
     """
     # State to hold the list of (timestamp, duration) tuples
     HISTORY = BagStateSpec('history', PickleCoder())
@@ -168,9 +168,9 @@ class AccumulateArrivals(beam.DoFn):
             # Sort by timestamp
             current_history.sort(key=lambda x: x['timestamp'])
             
-            # Keep only the last 160
-            if len(current_history) > 160:
-                current_history = current_history[-160:]
+            # Keep only the last 161
+            if len(current_history) > 161:
+                current_history = current_history[-161:]
             
             # Clear and rewrite state
             history_state.clear()
