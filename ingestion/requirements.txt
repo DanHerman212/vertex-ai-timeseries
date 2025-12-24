@@ -1,4 +1,0 @@
-google-cloud-pubsub==2.19.0
-requests==2.31.0
-gtfs-realtime-bindings==1.0.0
-protobuf==4.25.3
