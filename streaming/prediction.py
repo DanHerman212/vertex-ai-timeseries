@@ -225,7 +225,13 @@ class VertexAIPrediction(beam.DoFn):
         
         # Filter columns that actually exist
         final_cols = [c for c in required_cols if c in df.columns]
-        instances = df[final_cols].to_dict(orient='records')
+        
+        # CRITICAL FIX: Handle NaNs and Infinity which cause 400 Bad Request in JSON
+        df_final = df[final_cols].copy()
+        df_final = df_final.fillna(0)
+        df_final = df_final.replace([np.inf, -np.inf], 0)
+        
+        instances = df_final.to_dict(orient='records')
 
         if self.dry_run:
             logging.info(f"DRY RUN: Generated {len(instances)} instances for {key}")
