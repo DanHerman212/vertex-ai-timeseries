@@ -265,4 +265,7 @@ class VertexAIPrediction(beam.DoFn):
             
         except Exception as e:
             logging.error(f"Error calling Vertex AI for {key}: {e}")
+            # Log the payload to help debug 400 errors
+            logging.error(f"Payload that caused error (first 2 records): {instances[:2]}")
+            logging.error(f"Full payload length: {len(instances)}")
 
