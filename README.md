@@ -7,6 +7,7 @@
 ## Project Topics
 - [Architecture Overview](docs/ARCHITECTURE_OVERVIEW.md)
 - [Operations Guide](docs/OPERATIONS_GUIDE.md)
+- [Vertex AI ML Pipeline](docs/VERTEX_AI_PIPELINE.md)
 
 ## Project Overview
 This repository contains the code and configuration to create a prediction service, for passengers traveling on the NYC subway system.  The prediction service will tell passengers how many minutes until their train arrives at their station, to help manage uncertainty with their commute.<br>
