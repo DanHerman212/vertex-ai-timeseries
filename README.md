@@ -1,7 +1,7 @@
 # MTA Prediction Service Deployed on Google Cloud Platform
 
 <p align="center">
-  <img src="images/gcp_architecture.drawio.png" alt="Architecture Diagram">
+  <img src="images/architecture.drawio.png" alt="Architecture Diagram">
 </p>
 
 ## Project Topics
