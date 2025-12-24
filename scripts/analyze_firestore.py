@@ -4,13 +4,29 @@ from google.cloud import firestore
 from datetime import datetime
 import matplotlib.pyplot as plt
 
-def analyze_predictions(project_id, collection='predictions', limit=50):
+def analyze_predictions(project_id, collection='predictions', limit=50, count_only=False):
     """
     Fetches recent predictions from Firestore and displays them.
     """
     print(f"🔥 Connecting to Firestore (Project: {project_id})...")
     db = firestore.Client(project=project_id)
     
+    if count_only:
+        print(f"🔢 Counting documents in '{collection}'...")
+        try:
+            # Use aggregation query for efficiency
+            count_query = db.collection(collection).count()
+            results = count_query.get()
+            count = results[0][0].value
+            print(f"✅ Total documents in '{collection}': {count}")
+        except Exception as e:
+            print(f"⚠️  Could not use aggregation query: {e}")
+            # Fallback to stream (slow for large collections)
+            docs = db.collection(collection).stream()
+            count = sum(1 for _ in docs)
+            print(f"✅ Total documents in '{collection}': {count}")
+        return
+
     # Query the collection
     print(f"🔍 Fetching last {limit} documents from '{collection}'...")
     docs_stream = db.collection(collection)\
@@ -70,6 +86,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--project_id', required=True, help='GCP Project ID')
     parser.add_argument('--limit', type=int, default=50, help='Number of records to fetch')
+    parser.add_argument('--count-only', action='store_true', help='Only count total documents')
     args = parser.parse_args()
     
-    analyze_predictions(args.project_id, limit=args.limit)
+    analyze_predictions(args.project_id, limit=args.limit, count_only=args.count_only)
